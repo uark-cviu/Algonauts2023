@@ -8,8 +8,8 @@ def get_args_parser():
 
     # Model, data, etc
     parser.add_argument("--model_name", default="MicroVIT", type=str)
-    parser.add_argument("--num_lh_output", default=18978, type=int) 
-    parser.add_argument("--num_rh_output", default=20220, type=int)
+    parser.add_argument("--num_lh_output", default=19004, type=int) 
+    parser.add_argument("--num_rh_output", default=20544, type=int)
     parser.add_argument("--img_size", default=224, type=int)
     parser.add_argument("--patch_size", default=16, type=int)
     parser.add_argument("--is_train", default=True, type=utils.bool_flag)

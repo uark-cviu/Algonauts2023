@@ -42,13 +42,54 @@ class Criterion(nn.Module):
 
 class Metric:
     def __init__(self, args):
+        from torchmetrics import PearsonCorrCoef
+        # selpearson = PearsonCorrCoef()
         self.args = args
+        # Load the ROI classes mapping dictionaries
+        roi_mapping_files = ['mapping_prf-visualrois.npy', 'mapping_floc-bodies.npy',
+            'mapping_floc-faces.npy', 'mapping_floc-places.npy',
+            'mapping_floc-words.npy', 'mapping_streams.npy']
+        self.roi_name_maps = []
+        for r in roi_mapping_files:
+            self.roi_name_maps.append(np.load(os.path.join(args.data_dir, 'roi_masks', r),
+                allow_pickle=True).item())
 
-    def __call__(self, outputs, batch):
-        pred_lh_fmri = outputs['lh_fmri']
-        pred_rh_fmri = outputs['rh_fmri']
-        gt_lh_fmri = batch['lh_fmri']
-        gt_rh_fmri = batch['rh_fmri']
+        # Load the ROI brain surface maps
+        lh_challenge_roi_files = ['lh.prf-visualrois_challenge_space.npy',
+            'lh.floc-bodies_challenge_space.npy', 'lh.floc-faces_challenge_space.npy',
+            'lh.floc-places_challenge_space.npy', 'lh.floc-words_challenge_space.npy',
+            'lh.streams_challenge_space.npy']
+        rh_challenge_roi_files = ['rh.prf-visualrois_challenge_space.npy',
+            'rh.floc-bodies_challenge_space.npy', 'rh.floc-faces_challenge_space.npy',
+            'rh.floc-places_challenge_space.npy', 'rh.floc-words_challenge_space.npy',
+            'rh.streams_challenge_space.npy']
+        self.lh_challenge_rois = []
+        self.rh_challenge_rois = []
+        for r in range(len(lh_challenge_roi_files)):
+            self.lh_challenge_rois.append(np.load(os.path.join(args.data_dir, 'roi_masks',
+                lh_challenge_roi_files[r])))
+            self.rh_challenge_rois.append(np.load(os.path.join(args.data_dir, 'roi_masks',
+                rh_challenge_roi_files[r])))
+            
+        # plt.figure(figsize=(18,6))
+        # x = np.arange(len(roi_names))
+        # width = 0.30
+        # plt.bar(x - width/2, lh_median_roi_correlation, width, label='Left Hemisphere')
+        # plt.bar(x + width/2, rh_median_roi_correlation, width,
+        #     label='Right Hemishpere')
+        # plt.xlim(left=min(x)-.5, right=max(x)+.5)
+        # plt.ylim(bottom=0, top=1)
+        # plt.xlabel('ROIs')
+        # plt.xticks(ticks=x, labels=roi_names, rotation=60)
+        # plt.ylabel('Median Pearson\'s $r$')
+        # plt.legend(frameon=True, loc=1);
+
+    def __call__(self, pred_lh_fmri, pred_rh_fmri, gt_lh_fmri, gt_rh_fmri):
+    # def __call__(self, outputs, batch):
+        # pred_lh_fmri = outputs['lh_fmri'].detach().cpu().numpy()
+        # pred_rh_fmri = outputs['rh_fmri'].detach().cpu().numpy()
+        # gt_lh_fmri = batch['lh_fmri'].detach().cpu().numpy()
+        # gt_rh_fmri = batch['rh_fmri'].detach().cpu().numpy()
 
         # Empty correlation array of shape: (LH vertices)
         lh_correlation = np.zeros(pred_lh_fmri.shape[1])
@@ -62,8 +103,34 @@ class Metric:
         for v in range(pred_rh_fmri.shape[1]):
             rh_correlation[v] = corr(pred_rh_fmri[:,v], gt_rh_fmri[:,v])[0]
 
-        avg = lh_correlation.mean() + rh_correlation.mean()
-        return avg
+        # Select the correlation results vertices of each ROI
+        roi_names = []
+        lh_roi_correlation = []
+        rh_roi_correlation = []
+        for r1 in range(len(self.lh_challenge_rois)):
+            for r2 in self.roi_name_maps[r1].items():
+                if r2[0] != 0: # zeros indicate to vertices falling outside the ROI of interest
+                    roi_names.append(r2[1])
+                    lh_roi_idx = np.where(self.lh_challenge_rois[r1] == r2[0])[0]
+                    rh_roi_idx = np.where(self.rh_challenge_rois[r1] == r2[0])[0]
+                    lh_roi_correlation.append(lh_correlation[lh_roi_idx])
+                    rh_roi_correlation.append(rh_correlation[rh_roi_idx])
+        roi_names.append('All vertices')
+        lh_roi_correlation.append(lh_correlation)
+        rh_roi_correlation.append(rh_correlation)
+
+        # Create the plot
+        lh_median_roi_correlation = [np.median(lh_roi_correlation[r])
+            for r in range(len(lh_roi_correlation))]
+        rh_median_roi_correlation = [np.median(rh_roi_correlation[r])
+            for r in range(len(rh_roi_correlation))]
+        
+
+        avg = (lh_median_roi_correlation[-1] + rh_median_roi_correlation[-1])/2
+        
+        return {
+            "corr": avg
+        }
 
 
 def get_model(args, distributed=True):
@@ -212,7 +279,7 @@ def train(args):
     print(f"Loss, optimizer and schedulers ready.")
 
     # ============ optionally resume training ... ============
-    to_restore = {"epoch": 0, "best_score": np.inf}
+    to_restore = {"epoch": 0, "best_score": -np.inf}
     is_save_best = False
     if os.path.isfile(args.resume):
         utils.restart_from_checkpoint(
@@ -290,11 +357,11 @@ def train(args):
                 args,
             )
 
-            current_score = min(valid_stats["l1"], ema_valid_stats["l1"])
+            current_score = min(valid_stats["corr"], ema_valid_stats["corr"])
         else:
-            current_score = valid_stats["l1"]
+            current_score = valid_stats["corr"]
 
-        if current_score < best_score:
+        if current_score > best_score:
             best_score = current_score
             is_save_best = True
             patient_counter = 0
@@ -359,16 +426,20 @@ def train_one_epoch(
     is_train,
     args,
 ):
-
-    metric_fn = Metric(args)
     if is_train:
         model.train()
         prefix = "TRAIN"
     else:
         model.eval()
         prefix = "VALID"
+        metric_fn = Metric(args)
+        pred_lh_fmris = []
+        pred_rh_fmris = []
+        gt_lh_fmris = []
+        gt_rh_fmris = []
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = "Epoch: [{}/{}]".format(epoch, args.epochs)
+
     for batch in metric_logger.log_every(data_loader, 50, header):
         for k, v in batch.items():
             if isinstance(v, torch.Tensor):
@@ -385,10 +456,17 @@ def train_one_epoch(
             if not args.distributed:
                 loss = loss.mean()
 
-            metric_dict = metric_fn(outputs, batch)
-            # metric_dict = {
-            #     'l1': loss
-            # }
+
+            if not is_train:
+                pred_lh_fmri = outputs['lh_fmri'].detach().cpu().numpy()
+                pred_rh_fmri = outputs['rh_fmri'].detach().cpu().numpy()
+                gt_lh_fmri = batch['lh_fmri'].detach().cpu().numpy()
+                gt_rh_fmri = batch['rh_fmri'].detach().cpu().numpy()
+
+                pred_lh_fmris.append(pred_lh_fmri)
+                pred_rh_fmris.append(pred_rh_fmri)
+                gt_lh_fmris.append(gt_lh_fmri)
+                gt_rh_fmris.append(gt_rh_fmri)
 
         if not math.isfinite(loss.item()):
             print("Loss is {}, stopping training".format(loss.item()), force=True)
@@ -413,10 +491,24 @@ def train_one_epoch(
         # logging
         torch.cuda.synchronize()
         metric_logger.update(loss=loss.item())
-        for k, v in metric_dict.items():
-            metric_logger.update(**{k: v})
+        # for k, v in metric_dict.items():
+        #     metric_logger.update(**{k: v})
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
         metric_logger.update(wd=optimizer.param_groups[0]["weight_decay"])
+
+    if not is_train:
+
+                # pred_lh_fmris.append(pred_lh_fmri)
+                # pred_rh_fmris.append(pred_rh_fmri)
+                # gt_lh_fmris.append(gt_lh_fmri)
+                # gt_rh_fmris.append(gt_rh_fmri)
+        pred_lh_fmris = np.concatenate(pred_lh_fmris, axis=0)
+        pred_rh_fmris = np.concatenate(pred_rh_fmris, axis=0)
+        gt_lh_fmris = np.concatenate(gt_lh_fmris, axis=0)
+        gt_rh_fmris = np.concatenate(gt_rh_fmris, axis=0)
+        metric_dict = metric_fn(pred_lh_fmris, pred_rh_fmris, gt_lh_fmris, gt_rh_fmris)
+        for k, v in metric_dict.items():
+            metric_logger.update(**{k: v})
     # gather the stats from all processes
     if args.distributed:
         metric_logger.synchronize_between_processes()

@@ -42,9 +42,7 @@ distributed=True
 epochs=100
 img_size=224
 saveckp_freq=5
-fold=0
-output_dir=logs/baseline/${model_name}/${fold}/
-data_dir=/scratch/1576189/data
+
 
 # export CUDA_VISIBLE_DEVICES=0
 
@@ -67,17 +65,27 @@ fi
 
 echo "Run command ", $command
 
-PYTHONPATH=. $command \
-        scripts/train.py \
-        --model_name ${model_name} \
-        --output_dir ${output_dir} \
-        --data_dir ${data_dir} \
-        --batch_size_per_gpu ${batch_size} \
-        --lr ${lr} \
-        --img_size ${img_size} \
-        --fold ${fold} \
-        --epochs ${epochs} \
-        --distributed ${distributed} \
-        --saveckp_freq ${saveckp_freq} \
-        --num_workers 16 \
-        --use_fp16 False
+for fold in 4 3 2 1 0 ; do
+        for subject in subj01 ; do
+                output_dir=logs/baseline/${subject}/${model_name}/${fold}/
+                # data_dir=/scratch/1576189/data
+                data_dir=data/${subject}/
+                csv_file=${data_dir}/kfold.csv
+
+                PYTHONPATH=. $command \
+                        scripts/train.py \
+                        --model_name ${model_name} \
+                        --output_dir ${output_dir} \
+                        --data_dir ${data_dir} \
+                        --csv_file ${csv_file} \
+                        --batch_size_per_gpu ${batch_size} \
+                        --lr ${lr} \
+                        --img_size ${img_size} \
+                        --fold ${fold} \
+                        --epochs ${epochs} \
+                        --distributed ${distributed} \
+                        --saveckp_freq ${saveckp_freq} \
+                        --num_workers 4 \
+                        --use_fp16 False
+        done
+done
