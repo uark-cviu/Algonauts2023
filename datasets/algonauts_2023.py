@@ -103,6 +103,17 @@ class AlgonautsDataset(Dataset):
         self.transform = transform
         self.fmri_dict = {}
 
+        subject = data_dir.split("/")[-1]
+        if subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj07']:
+            self.num_lh_output = 19004
+            self.num_rh_output = 20544
+        elif subject in ['subj06']:
+            self.num_lh_output = 18978
+            self.num_rh_output = 20220
+        elif subject in ['subj08']:
+            self.num_lh_output = 18981
+            self.num_rh_output = 20530
+
     def load_image(self, img_path):
         return Image.open(img_path).convert('RGB')
     

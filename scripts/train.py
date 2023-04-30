@@ -218,6 +218,10 @@ def get_dataloader(args):
         sampler=valid_sampler
     )
 
+
+    args.num_lh_output = train_dataset.num_lh_output
+    args.num_rh_output = train_dataset.num_rh_output
+
     return train_loader, valid_loader
 
 

@@ -39,7 +39,7 @@ model_name='vit_small_patch16_224'
 batch_size=32
 lr=2.5e-4
 distributed=True
-epochs=100
+epochs=20
 img_size=224
 saveckp_freq=5
 
