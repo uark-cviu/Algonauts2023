@@ -21,6 +21,7 @@ from schedulers import OneCycleLRWithWarmup
 from utils import dino as utils
 from utils.algonauts_parser import get_args_parser
 from datasets.algonauts_2023 import AlgonautsDataset
+from scipy.stats import pearsonr as corr
 
 
 class Criterion(nn.Module):
@@ -38,6 +39,7 @@ class Criterion(nn.Module):
         loss = self.l1_loss(pred_lh_fmri, gt_lh_fmri) + self.l1_loss(pred_rh_fmri, gt_rh_fmri)
         return loss
 
+
 class Metric:
     def __init__(self, args):
         self.args = args
@@ -48,20 +50,20 @@ class Metric:
         gt_lh_fmri = batch['lh_fmri']
         gt_rh_fmri = batch['rh_fmri']
 
-        return None
+        # Empty correlation array of shape: (LH vertices)
+        lh_correlation = np.zeros(pred_lh_fmri.shape[1])
+        # Correlate each predicted LH vertex with the corresponding ground truth vertex
+        for v in range(pred_lh_fmri.shape[1]):
+            lh_correlation[v] = corr(pred_lh_fmri[:,v], gt_lh_fmri[:,v])[0]
 
+        # Empty correlation array of shape: (RH vertices)
+        rh_correlation = np.zeros(pred_rh_fmri.shape[1])
+        # Correlate each predicted RH vertex with the corresponding ground truth vertex
+        for v in range(pred_rh_fmri.shape[1]):
+            rh_correlation[v] = corr(pred_rh_fmri[:,v], gt_rh_fmri[:,v])[0]
 
-        # # Empty correlation array of shape: (LH vertices)
-        # lh_correlation = np.zeros(pred_lh_fmri.shape[1])
-        # # Correlate each predicted LH vertex with the corresponding ground truth vertex
-        # for v in range(pred_lh_fmri.shape[1]):
-        #     lh_correlation[v] = corr(pred_lh_fmri[:,v], gt_lh_fmri[:,v])[0]
-
-        # # Empty correlation array of shape: (RH vertices)
-        # rh_correlation = np.zeros(pred_rh_fmri.shape[1])
-        # # Correlate each predicted RH vertex with the corresponding ground truth vertex
-        # for v in range(pred_rh_fmri.shape[1]):
-        #     rh_correlation[v] = corr(pred_rh_fmri[:,v], gt_rh_fmri[:,v])[0]
+        avg = lh_correlation.mean() + rh_correlation.mean()
+        return avg
 
 
 def get_model(args, distributed=True):
@@ -383,10 +385,10 @@ def train_one_epoch(
             if not args.distributed:
                 loss = loss.mean()
 
-            # metric_dict = metric_fn(outputs, batch)
-            metric_dict = {
-                'l1': loss
-            }
+            metric_dict = metric_fn(outputs, batch)
+            # metric_dict = {
+            #     'l1': loss
+            # }
 
         if not math.isfinite(loss.item()):
             print("Loss is {}, stopping training".format(loss.item()), force=True)
