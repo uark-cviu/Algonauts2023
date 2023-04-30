@@ -27,6 +27,8 @@ CPUS_PER_TASK=${CPUS_PER_TASK:-4}
 NODE_LIST=${NODE_LIST:-'c1905'}
 
 RUN_MODE=${RUN_MODE:-"dist"}
+SUBJECT=${SUBJECT:-"subj01"}
+subject=subj08
 
 export WORLD_SIZE=$WORLD_SIZE
 export MASTER_ADDR=$MASTER_ADDR
@@ -39,7 +41,7 @@ model_name='vit_small_patch16_224'
 batch_size=32
 lr=2.5e-4
 distributed=True
-epochs=20
+epochs=30
 img_size=224
 saveckp_freq=5
 
@@ -66,10 +68,10 @@ fi
 echo "Run command ", $command
 
 for fold in 4 3 2 1 0 ; do
-        for subject in subj01 ; do
+        # for subject in subj01 subj02 subj03 subj04 subj05 subj06 subj07 subj08 ; do
                 output_dir=logs/baseline/${subject}/${model_name}/${fold}/
                 # data_dir=/scratch/1576189/data
-                data_dir=data/${subject}/
+                data_dir=data/${subject}
                 csv_file=${data_dir}/kfold.csv
 
                 PYTHONPATH=. $command \
@@ -87,5 +89,5 @@ for fold in 4 3 2 1 0 ; do
                         --saveckp_freq ${saveckp_freq} \
                         --num_workers 4 \
                         --use_fp16 False
-        done
+        # done
 done

@@ -18,7 +18,7 @@ import os
 #                 'image': images
 #             })
 #             df['fold'] = 0
-        
+
 #             for fold, (_, valid_idx) in enumerate(kf.split(images)):
 #                 df.iloc[valid_idx, -1] = fold
 
@@ -37,7 +37,7 @@ import os
 
 #     def load_image(self, img_path):
 #         return Image.open(img_path).convert('RGB')
-    
+
 #     def load_fmri(self, img_path, prefix='lh'):
 #         subject_id = img_path.split("/")[-4]
 #         index = int(img_path.split("/")[-1].split(".")[0].split("-")[1].split("_")[0])- 1
@@ -72,7 +72,7 @@ import os
 #             "lh_fmri": lh_fmri,
 #             "rh_fmri": rh_fmri
 #         }
-    
+
 
 class AlgonautsDataset(Dataset):
     def __init__(self, data_dir, csv_file=None, transform=None, fold=0, num_folds=5, is_train=True):
@@ -86,7 +86,7 @@ class AlgonautsDataset(Dataset):
                 'image': images
             })
             df['fold'] = 0
-        
+
             for fold, (_, valid_idx) in enumerate(kf.split(images)):
                 df.iloc[valid_idx, -1] = fold
 
@@ -114,9 +114,41 @@ class AlgonautsDataset(Dataset):
             self.num_lh_output = 18981
             self.num_rh_output = 20530
 
+        if subject == 'subj01':
+            self.min_max_lh = [-5.5488534, 6.3958163]
+            self.min_max_rh = [-6.224722, 6.2803955]
+
+        elif subject == 'subj02':
+            self.min_max_lh = [-6.2695646 ,  7.303040]
+            self.min_max_rh = [-7.10663 ,  6.722497]
+
+        elif subject == 'subj03':
+            self.min_max_lh = [-9.143569 ,  7.1541204]
+            self.min_max_rh = [-7.3392262 ,  7.5514464]
+
+        elif subject == 'subj04':
+            self.min_max_lh = [-10.779788 ,  12.100054]
+            self.min_max_rh = [-9.624842 ,  14.346183]
+
+        elif subject == 'subj05':
+            self.min_max_lh = [-6.7292423 ,  7.357646]
+            self.min_max_rh = [-7.615682 ,  7.400172]
+
+        elif subject == 'subj06':
+            self.min_max_lh = [-8.748659 ,  9.179561]
+            self.min_max_rh = [-9.317543 ,  9.996536]
+
+        elif subject == 'subj07':
+            self.min_max_lh = [-7.806317 ,  8.991561]
+            self.min_max_rh = [-10.895111 ,  8.987522]
+
+        elif subject == 'subj08':
+            self.min_max_lh = [ -11.138769 ,  10.5266905]
+            self.min_max_rh = [-9.20942 ,  10.573892]
+
     def load_image(self, img_path):
         return Image.open(img_path).convert('RGB')
-    
+
     def load_fmri(self, img_path, prefix='lh'):
         subject_id = img_path.split("/")[-4]
         index = int(img_path.split("/")[-1].split(".")[0].split("-")[1].split("_")[0])- 1
@@ -135,6 +167,25 @@ class AlgonautsDataset(Dataset):
 
         return fmri_data[index]
 
+    # def min_max_transform(self, arr, prefix='lh'):
+    #     if prefix == 'lh':
+    #         min_val, max_val = self.min_max_lh
+    #     else:
+    #         min_val, max_val = self.min_max_rh
+    #     return 2 * (arr - min_val) / (max_val - min_val) - 1
+
+    # def min_max_transform(self, arr, prefix='lh'):
+    #     if prefix == 'lh':
+    #         min_val, max_val = self.min_max_lh
+    #     else:
+    #         min_val, max_val = self.min_max_rh
+    #     return arr / max_val
+
+
+    def min_max_transform(self, arr, prefix='lh'):
+        return arr
+
+
     def __len__(self):
         return len(self.images)
 
@@ -143,9 +194,13 @@ class AlgonautsDataset(Dataset):
         img_path = self.images[idx]
         img = self.load_image(img_path)
         lh_fmri = self.load_fmri(img_path, prefix='lh')
+        lh_fmri = self.min_max_transform(lh_fmri, prefix='lh')
+
         rh_fmri = self.load_fmri(img_path, prefix='rh')
+        rh_fmri = self.min_max_transform(rh_fmri, prefix='rh')
         if self.transform:
             img = self.transform(img)
+
         return {
             "image": img,
             "lh_fmri": lh_fmri,

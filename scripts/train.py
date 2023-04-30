@@ -42,7 +42,7 @@ class Criterion(nn.Module):
 
 class Metric:
     def __init__(self, args):
-        from torchmetrics import PearsonCorrCoef
+        # from torchmetrics import PearsonCorrCoef
         # selpearson = PearsonCorrCoef()
         self.args = args
         # Load the ROI classes mapping dictionaries
@@ -70,26 +70,38 @@ class Metric:
                 lh_challenge_roi_files[r])))
             self.rh_challenge_rois.append(np.load(os.path.join(args.data_dir, 'roi_masks',
                 rh_challenge_roi_files[r])))
-            
-        # plt.figure(figsize=(18,6))
-        # x = np.arange(len(roi_names))
-        # width = 0.30
-        # plt.bar(x - width/2, lh_median_roi_correlation, width, label='Left Hemisphere')
-        # plt.bar(x + width/2, rh_median_roi_correlation, width,
-        #     label='Right Hemishpere')
-        # plt.xlim(left=min(x)-.5, right=max(x)+.5)
-        # plt.ylim(bottom=0, top=1)
-        # plt.xlabel('ROIs')
-        # plt.xticks(ticks=x, labels=roi_names, rotation=60)
-        # plt.ylabel('Median Pearson\'s $r$')
-        # plt.legend(frameon=True, loc=1);
+
+
+    # def inverse_min_max_transform(self, arr, prefix='lh'):
+    #     if prefix == 'lh':
+    #         min_val, max_val = self.args.min_max_lh
+    #     else:
+    #         min_val, max_val = self.args.min_max_rh
+
+    #     arr = (arr + 1)/2
+
+    #     return arr * (max_val - min_val) + min_val
+
+    # def inverse_min_max_transform(self, arr, prefix='lh'):
+    #     if prefix == 'lh':
+    #         min_val, max_val = self.args.min_max_lh
+    #     else:
+    #         min_val, max_val = self.args.min_max_rh
+
+    #     return arr * max_val
+
+
+    def inverse_min_max_transform(self, arr, prefix='lh'):
+        return arr
+
 
     def __call__(self, pred_lh_fmri, pred_rh_fmri, gt_lh_fmri, gt_rh_fmri):
-    # def __call__(self, outputs, batch):
-        # pred_lh_fmri = outputs['lh_fmri'].detach().cpu().numpy()
-        # pred_rh_fmri = outputs['rh_fmri'].detach().cpu().numpy()
-        # gt_lh_fmri = batch['lh_fmri'].detach().cpu().numpy()
-        # gt_rh_fmri = batch['rh_fmri'].detach().cpu().numpy()
+
+        pred_lh_fmri = self.inverse_min_max_transform(pred_lh_fmri, prefix='lh')
+        pred_rh_fmri = self.inverse_min_max_transform(pred_rh_fmri, prefix='rh')
+
+        gt_lh_fmri = self.inverse_min_max_transform(gt_lh_fmri, prefix='lh')
+        gt_rh_fmri = self.inverse_min_max_transform(gt_rh_fmri, prefix='rh')
 
         # Empty correlation array of shape: (LH vertices)
         lh_correlation = np.zeros(pred_lh_fmri.shape[1])
@@ -124,10 +136,10 @@ class Metric:
             for r in range(len(lh_roi_correlation))]
         rh_median_roi_correlation = [np.median(rh_roi_correlation[r])
             for r in range(len(rh_roi_correlation))]
-        
+
 
         avg = (lh_median_roi_correlation[-1] + rh_median_roi_correlation[-1])/2
-        
+
         return {
             "corr": avg
         }
@@ -155,7 +167,7 @@ def get_model(args, distributed=True):
     else:
         model = nn.DataParallel(model)
 
-    print(model)
+    # print(model)
 
     return model, model_ema
 
@@ -221,6 +233,9 @@ def get_dataloader(args):
 
     args.num_lh_output = train_dataset.num_lh_output
     args.num_rh_output = train_dataset.num_rh_output
+
+    args.min_max_lh = train_dataset.min_max_lh
+    args.min_max_rh = train_dataset.min_max_rh
 
     return train_loader, valid_loader
 
@@ -525,3 +540,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     train(args)
+
