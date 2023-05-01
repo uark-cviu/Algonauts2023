@@ -28,14 +28,15 @@ NODE_LIST=${NODE_LIST:-'c1905'}
 
 RUN_MODE=${RUN_MODE:-"dist"}
 SUBJECT=${SUBJECT:-"subj01"}
-subject=subj08
+subject=${SUBJECT}
 
 export WORLD_SIZE=$WORLD_SIZE
 export MASTER_ADDR=$MASTER_ADDR
 export MASTER_PORT=$MASTER_PORT
 export OFFSET=${OFFSET}
 
-model_name='vit_small_patch16_224'
+# model_name='vit_small_patch16_224'
+model_name='tf_efficientnet_b5_ns'
 
 # Data
 batch_size=32
@@ -67,27 +68,22 @@ fi
 
 echo "Run command ", $command
 
-for fold in 4 3 2 1 0 ; do
-        # for subject in subj01 subj02 subj03 subj04 subj05 subj06 subj07 subj08 ; do
-                output_dir=logs/baseline/${subject}/${model_name}/${fold}/
-                # data_dir=/scratch/1576189/data
-                data_dir=data/${subject}
-                csv_file=${data_dir}/kfold.csv
+output_dir=logs/baseline/${subject}/${model_name}/
+# data_dir=/scratch/1576189/data
+data_dir=data/${subject}
+csv_file=${data_dir}/kfold.csv
 
-                PYTHONPATH=. $command \
-                        scripts/train.py \
-                        --model_name ${model_name} \
-                        --output_dir ${output_dir} \
-                        --data_dir ${data_dir} \
-                        --csv_file ${csv_file} \
-                        --batch_size_per_gpu ${batch_size} \
-                        --lr ${lr} \
-                        --img_size ${img_size} \
-                        --fold ${fold} \
-                        --epochs ${epochs} \
-                        --distributed ${distributed} \
-                        --saveckp_freq ${saveckp_freq} \
-                        --num_workers 4 \
-                        --use_fp16 False
-        # done
-done
+PYTHONPATH=. $command \
+        scripts/train.py \
+        --model_name ${model_name} \
+        --output_dir ${output_dir} \
+        --data_dir ${data_dir} \
+        --csv_file ${csv_file} \
+        --batch_size_per_gpu ${batch_size} \
+        --lr ${lr} \
+        --img_size ${img_size} \
+        --epochs ${epochs} \
+        --distributed ${distributed} \
+        --saveckp_freq ${saveckp_freq} \
+        --num_workers 4 \
+        --use_fp16 False

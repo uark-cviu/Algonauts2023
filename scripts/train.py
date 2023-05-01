@@ -240,22 +240,7 @@ def get_dataloader(args):
     return train_loader, valid_loader
 
 
-def train(args):
-
-    # args.distributed = True
-
-    if "WORLD_SIZE" in os.environ:
-        args.world_size = int(os.environ["WORLD_SIZE"])
-
-    if args.distributed:
-        utils.init_distributed_mode(args)
-    utils.fix_random_seeds(args.seed)
-    print("git:\n  {}\n".format(utils.get_sha()))
-    print(
-        "\n".join("%s: %s" % (k, str(v)) for k, v in sorted(dict(vars(args)).items()))
-    )
-    cudnn.benchmark = True
-
+def train_one_fold(args):
     # ============ preparing data ... ============
     train_loader, valid_loader = get_dataloader(args)
 
@@ -431,6 +416,33 @@ def train(args):
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print("Training time {}".format(total_time_str))
+
+
+
+def train(args):
+
+    # args.distributed = True
+
+    if "WORLD_SIZE" in os.environ:
+        args.world_size = int(os.environ["WORLD_SIZE"])
+
+    if args.distributed:
+        utils.init_distributed_mode(args)
+    utils.fix_random_seeds(args.seed)
+    print("git:\n  {}\n".format(utils.get_sha()))
+    print(
+        "\n".join("%s: %s" % (k, str(v)) for k, v in sorted(dict(vars(args)).items()))
+    )
+    cudnn.benchmark = True
+
+    output_dir = args.output_dir
+
+    for fold in [0, 1, 2, 3, 4]:
+        print("training fold ", fold)
+        args.fold = fold
+        args.output_dir = f"{output_dir}/{fold}/"
+        os.makedirs(args.output_dir, exist_ok=True)
+        train_one_fold(args)
 
 
 def train_one_epoch(
