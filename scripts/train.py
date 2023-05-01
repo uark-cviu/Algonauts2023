@@ -22,6 +22,7 @@ from utils import dino as utils
 from utils.algonauts_parser import get_args_parser
 from datasets.algonauts_2023 import AlgonautsDataset
 from scipy.stats import pearsonr as corr
+from criterions.pcc import PCCLoss
 
 
 class Criterion(nn.Module):
@@ -29,6 +30,7 @@ class Criterion(nn.Module):
         super().__init__()
         self.args = args
         self.l1_loss = nn.SmoothL1Loss()
+        self.pcc = PCCLoss()
 
     def forward(self, outputs, batch):
         pred_lh_fmri = outputs['lh_fmri']
@@ -36,7 +38,10 @@ class Criterion(nn.Module):
         gt_lh_fmri = batch['lh_fmri']
         gt_rh_fmri = batch['rh_fmri']
 
-        loss = self.l1_loss(pred_lh_fmri, gt_lh_fmri) + self.l1_loss(pred_rh_fmri, gt_rh_fmri)
+        l1_loss = self.l1_loss(pred_lh_fmri, gt_lh_fmri) + self.l1_loss(pred_rh_fmri, gt_rh_fmri)
+        pcc_loss = self.pcc(pred_lh_fmri, gt_lh_fmri) + self.pcc(pred_rh_fmri, gt_rh_fmri)
+        loss = l1_loss + pcc_loss
+        # import pdb; pdb.set_trace()
         return loss
 
 
