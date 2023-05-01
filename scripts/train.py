@@ -92,7 +92,7 @@ class Metric:
 
 
     def inverse_min_max_transform(self, arr, prefix='lh'):
-        return arr
+        return arr * 15
 
 
     def __call__(self, pred_lh_fmri, pred_rh_fmri, gt_lh_fmri, gt_rh_fmri):

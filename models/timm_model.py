@@ -1,5 +1,6 @@
 import torch.nn as nn
 import timm
+import torch
 
 
 
@@ -22,6 +23,9 @@ class AlgonautsTimm(nn.Module):
         features = self.backbone(image)
         lh_fmri = self.lh_fmri_fc(features)
         rh_fmri = self.rh_fmri_fc(features)
+
+        # lh_fmri = torch.tanh(lh_fmri)
+        # rh_fmri = torch.tanh(rh_fmri)
 
         return {
             'lh_fmri': lh_fmri,

@@ -36,7 +36,8 @@ export MASTER_PORT=$MASTER_PORT
 export OFFSET=${OFFSET}
 
 # model_name='vit_small_patch16_224'
-model_name='tf_efficientnet_b5_ns'
+model_name='convnext_base_in22ft1k'
+# model_name='tf_efficientnet_b5_ns'
 
 # Data
 batch_size=32

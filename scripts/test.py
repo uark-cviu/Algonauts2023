@@ -134,6 +134,8 @@ def train(args):
         pred_rh_final += pred_rh_fmris / len(folds)
         pred_lh_final += pred_lh_fmris / len(folds)
 
+    print(pred_rh_final.min(), pred_rh_final.max())
+    print(pred_lh_final.min(), pred_lh_final.max())
     output_dir = args.output_dir
     output_dir = f"{output_dir}/{subject_id}"
     os.makedirs(output_dir, exist_ok=True)
