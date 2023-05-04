@@ -98,6 +98,7 @@ def train(args):
         checkpoint = f"{args.checkpoint_dir}/{fold}/best.pth"
         checkpoint = torch.load(checkpoint)
         train_args = checkpoint['args']
+        print(train_args)
         best_score = checkpoint['best_score']
         subject_id = train_args.data_dir.split("/")[-1]
         print(f"[+] Predicting {fold} of {subject_id}, best score: {best_score}")

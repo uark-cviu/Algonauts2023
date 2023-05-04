@@ -30,6 +30,7 @@ class Criterion(nn.Module):
         super().__init__()
         self.args = args
         self.l1_loss = nn.SmoothL1Loss()
+        self.mse_loss = nn.MSELoss()
         self.pcc = PCCLoss()
 
     def forward(self, outputs, batch):
@@ -42,6 +43,7 @@ class Criterion(nn.Module):
         pcc_loss = self.pcc(pred_lh_fmri, gt_lh_fmri) + self.pcc(pred_rh_fmri, gt_rh_fmri)
         loss = l1_loss + pcc_loss
         # import pdb; pdb.set_trace()
+
         return loss
 
 
@@ -183,6 +185,19 @@ def get_dataloader(args):
     train_transform = transforms.Compose(
         [
             transforms.Resize((args.img_size, args.img_size)),
+            # transforms.RandomResizedCrop(args.img_size),
+            # transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ]
+    )
+
+
+    valid_transform = transforms.Compose(
+        [
+            transforms.Resize((args.img_size, args.img_size)),
+            # transforms.Resize(256),
+            # transforms.CenterCrop(args.img_size),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ]
@@ -200,7 +215,7 @@ def get_dataloader(args):
     valid_dataset = AlgonautsDataset(
         data_dir=args.data_dir,
         csv_file=args.csv_file,
-        transform=train_transform,
+        transform=valid_transform,
         fold=args.fold,
         num_folds=args.num_folds,
         is_train=False
