@@ -36,11 +36,11 @@ export MASTER_PORT=$MASTER_PORT
 export OFFSET=${OFFSET}
 
 # model_name='vit_small_patch16_224'
-# model_name='convnext_base_in22ft1k'
+model_name='convnext_base_in22ft1k'
 # model_name='tf_efficientnet_b5_ns'
 # model_name='maxvit_base_tf_384.in21k_ft_in1k'
 # model_name='eva_giant_patch14_224.clip_ft_in1k'
-model_name='ssl_resnext50_32x4d'
+# model_name='ssl_resnext50_32x4d'
 
 # Data
 batch_size=32
@@ -73,7 +73,7 @@ fi
 echo "Run command ", $command
 
 # output_dir=logs/baseline_pcc_l1/${subject}/${model_name}/
-output_dir=/scr1/1576189/logs/baseline_pcc_l1_384/${subject}/${model_name}/
+output_dir=/scr1/1576189/logs/baseline_pcc_l1_384_ema/${subject}/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/${subject}
 csv_file=${data_dir}/kfold.csv
@@ -91,4 +91,5 @@ PYTHONPATH=. $command \
         --distributed ${distributed} \
         --saveckp_freq ${saveckp_freq} \
         --num_workers 4 \
-        --use_fp16 False
+        --use_fp16 False \
+        --use_ema True

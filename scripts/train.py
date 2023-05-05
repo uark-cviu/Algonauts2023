@@ -381,7 +381,7 @@ def train_one_fold(args):
                 args,
             )
 
-            current_score = min(valid_stats["corr"], ema_valid_stats["corr"])
+            current_score = max(valid_stats["corr"], ema_valid_stats["corr"])
         else:
             current_score = valid_stats["corr"]
 
@@ -415,7 +415,7 @@ def train_one_fold(args):
         if is_save_best:
             utils.save_on_master(save_dict, os.path.join(args.output_dir, "best.pth"))
 
-        # utils.save_on_master(save_dict, os.path.join(args.output_dir, "last.pth"))
+        utils.save_on_master(save_dict, os.path.join(args.output_dir, "last.pth"))
 
         log_train_stats = {
             **{f"train_{k}": v for k, v in train_stats.items()},

@@ -43,14 +43,14 @@ def get_model(args):
 
     # move networks to gpu
     model = model.cuda()
-    if args.use_ema:
-        model_ema = timm.utils.ModelEmaV2(model, decay=args.ema_decay)
-    else:
-        model_ema = None
+    # if args.use_ema:
+    #     model_ema = timm.utils.ModelEmaV2(model, decay=args.ema_decay)
+    # else:
+    #     model_ema = None
 
     model = nn.DataParallel(model)
 
-    return model, model_ema
+    return model
 
 
 def get_dataloader(args):
@@ -108,8 +108,9 @@ def train(args):
             data_loader = get_dataloader(train_args)
 
         # ============ building Clusformer ... ============
-        model, model_ema = get_model(train_args)
-        model.load_state_dict(checkpoint['model'])
+        model = get_model(train_args)
+        # model.load_state_dict(checkpoint['model'])
+        model.load_state_dict(checkpoint['ema'])
         model.eval()
 
         pred_rh_fmris = []
