@@ -73,7 +73,7 @@ fi
 echo "Run command ", $command
 
 # output_dir=logs/baseline_pcc_l1/${subject}/${model_name}/
-output_dir=/scr1/1576189/logs/baseline_pcc_l1_384_ema/${subject}/${model_name}/
+output_dir=/scr1/1576189/logs/baseline_pcc_l1_384_ema_adaptive_loss/${subject}/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/${subject}
 csv_file=${data_dir}/kfold.csv

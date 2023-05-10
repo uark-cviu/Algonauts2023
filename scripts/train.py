@@ -23,6 +23,7 @@ from utils.algonauts_parser import get_args_parser
 from datasets.algonauts_2023 import AlgonautsDataset
 from scipy.stats import pearsonr as corr
 from criterions.pcc import PCCLoss
+import robust_loss_pytorch
 
 
 class Criterion(nn.Module):
@@ -32,6 +33,13 @@ class Criterion(nn.Module):
         self.l1_loss = nn.SmoothL1Loss()
         self.mse_loss = nn.MSELoss()
         self.pcc = PCCLoss()
+        self.adaptive_lh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
+            num_dims = args.num_lh_output, float_dtype=np.float32, device='cuda:0'
+        )
+
+        self.adaptive_rh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
+            num_dims = args.num_rh_output, float_dtype=np.float32, device='cuda:0'
+        )
 
     def forward(self, outputs, batch):
         pred_lh_fmri = outputs['lh_fmri']
@@ -39,7 +47,10 @@ class Criterion(nn.Module):
         gt_lh_fmri = batch['lh_fmri']
         gt_rh_fmri = batch['rh_fmri']
 
-        l1_loss = self.l1_loss(pred_lh_fmri, gt_lh_fmri) + self.l1_loss(pred_rh_fmri, gt_rh_fmri)
+        # l1_loss = self.l1_loss(pred_lh_fmri, gt_lh_fmri) + self.l1_loss(pred_rh_fmri, gt_rh_fmri)
+        loss_lh = torch.mean(self.adaptive_lh.lossfun((pred_lh_fmri - gt_lh_fmri)))
+        loss_rh = torch.mean(self.adaptive_rh.lossfun((pred_rh_fmri - gt_rh_fmri)))
+        l1_loss = loss_lh + loss_rh
         pcc_loss = self.pcc(pred_lh_fmri, gt_lh_fmri) + self.pcc(pred_rh_fmri, gt_rh_fmri)
         loss = l1_loss + pcc_loss
         # import pdb; pdb.set_trace()
