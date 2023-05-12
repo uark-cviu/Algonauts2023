@@ -55,6 +55,8 @@ saveckp_freq=5
 
 if [ "$RUN_MODE" = "dist" ]; then
         command="python -u -m torch.distributed.launch --nproc_per_node=${NGPUS} --master_port ${MASTER_PORT}"
+elif [ "$RUN_MODE" = "dist_new" ]; then
+        command="torchrun --nproc_per_node=${NGPUS} --master_port ${MASTER_PORT}"
 elif [ "$RUN_MODE" = "slurm" ]; then
         command="srun -p ${PARTITION} \
                 --job-name ${JOB_NAME} \
@@ -72,8 +74,8 @@ fi
 
 echo "Run command ", $command
 
-# output_dir=logs/baseline_pcc_l1/${subject}/${model_name}/
-output_dir=/scr1/1576189/logs/baseline_pcc_l1_384_ema_adaptive_loss/${subject}/${model_name}/
+# output_dir=logs/roi_pcc_l1_384_ema/${subject}/${model_name}/
+output_dir=/scr1/1594489/logs/roi_pcc_l1_384_ema/${subject}/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/${subject}
 csv_file=${data_dir}/kfold.csv
@@ -83,6 +85,7 @@ PYTHONPATH=. $command \
         --model_name ${model_name} \
         --output_dir ${output_dir} \
         --data_dir ${data_dir} \
+        --subject ${SUBJECT} \
         --csv_file ${csv_file} \
         --batch_size_per_gpu ${batch_size} \
         --lr ${lr} \

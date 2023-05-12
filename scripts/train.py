@@ -24,38 +24,43 @@ from datasets.algonauts_2023 import AlgonautsDataset
 from scipy.stats import pearsonr as corr
 from criterions.pcc import PCCLoss
 import robust_loss_pytorch
+import pickle
 
 
 class Criterion(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
+        self.subject_metadata = args.subject_metadata
         self.l1_loss = nn.SmoothL1Loss()
         self.mse_loss = nn.MSELoss()
         self.pcc = PCCLoss()
-        self.adaptive_lh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
-            num_dims = args.num_lh_output, float_dtype=np.float32, device='cuda:0'
-        )
 
-        self.adaptive_rh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
-            num_dims = args.num_rh_output, float_dtype=np.float32, device='cuda:0'
-        )
+    def get_gt_roi(self, gt_fmri, side, roi_name):
+        roi_idx = self.subject_metadata[side][roi_name]
+        return gt_fmri[:, np.where(roi_idx)[0]]
+
+    def loss(self, pred, gt):
+        pcc_loss = self.pcc(pred, gt)
+        l1_loss = self.l1_loss(pred, gt)
+        return pcc_loss + l1_loss
 
     def forward(self, outputs, batch):
-        pred_lh_fmri = outputs['lh_fmri']
-        pred_rh_fmri = outputs['rh_fmri']
-        gt_lh_fmri = batch['lh_fmri']
-        gt_rh_fmri = batch['rh_fmri']
+        total_loss = 0
+        count = 0
+        for side in ["l", "r"]:
+            # GT
+            gt_fmri = batch[side]
+            roi_names = outputs[side].keys()
+            for roi_name in roi_names:
+                pred = outputs[side][roi_name]
+                # import pdb; pdb.set_trace()
+                gt = self.get_gt_roi(gt_fmri, side, roi_name)
+                loss = self.loss(pred, gt)
+                total_loss += loss
+                count += 1
 
-        # l1_loss = self.l1_loss(pred_lh_fmri, gt_lh_fmri) + self.l1_loss(pred_rh_fmri, gt_rh_fmri)
-        loss_lh = torch.mean(self.adaptive_lh.lossfun((pred_lh_fmri - gt_lh_fmri)))
-        loss_rh = torch.mean(self.adaptive_rh.lossfun((pred_rh_fmri - gt_rh_fmri)))
-        l1_loss = loss_lh + loss_rh
-        pcc_loss = self.pcc(pred_lh_fmri, gt_lh_fmri) + self.pcc(pred_rh_fmri, gt_rh_fmri)
-        loss = l1_loss + pcc_loss
-        # import pdb; pdb.set_trace()
-
-        return loss
+        return total_loss / count
 
 
 class Metric:
@@ -64,74 +69,66 @@ class Metric:
         # selpearson = PearsonCorrCoef()
         self.args = args
         # Load the ROI classes mapping dictionaries
-        roi_mapping_files = ['mapping_prf-visualrois.npy', 'mapping_floc-bodies.npy',
-            'mapping_floc-faces.npy', 'mapping_floc-places.npy',
-            'mapping_floc-words.npy', 'mapping_streams.npy']
+        roi_mapping_files = [
+            "mapping_prf-visualrois.npy",
+            "mapping_floc-bodies.npy",
+            "mapping_floc-faces.npy",
+            "mapping_floc-places.npy",
+            "mapping_floc-words.npy",
+            "mapping_streams.npy",
+        ]
         self.roi_name_maps = []
         for r in roi_mapping_files:
-            self.roi_name_maps.append(np.load(os.path.join(args.data_dir, 'roi_masks', r),
-                allow_pickle=True).item())
+            self.roi_name_maps.append(
+                np.load(
+                    os.path.join(args.data_dir, "roi_masks", r), allow_pickle=True
+                ).item()
+            )
 
         # Load the ROI brain surface maps
-        lh_challenge_roi_files = ['lh.prf-visualrois_challenge_space.npy',
-            'lh.floc-bodies_challenge_space.npy', 'lh.floc-faces_challenge_space.npy',
-            'lh.floc-places_challenge_space.npy', 'lh.floc-words_challenge_space.npy',
-            'lh.streams_challenge_space.npy']
-        rh_challenge_roi_files = ['rh.prf-visualrois_challenge_space.npy',
-            'rh.floc-bodies_challenge_space.npy', 'rh.floc-faces_challenge_space.npy',
-            'rh.floc-places_challenge_space.npy', 'rh.floc-words_challenge_space.npy',
-            'rh.streams_challenge_space.npy']
+        lh_challenge_roi_files = [
+            "lh.prf-visualrois_challenge_space.npy",
+            "lh.floc-bodies_challenge_space.npy",
+            "lh.floc-faces_challenge_space.npy",
+            "lh.floc-places_challenge_space.npy",
+            "lh.floc-words_challenge_space.npy",
+            "lh.streams_challenge_space.npy",
+        ]
+        rh_challenge_roi_files = [
+            "rh.prf-visualrois_challenge_space.npy",
+            "rh.floc-bodies_challenge_space.npy",
+            "rh.floc-faces_challenge_space.npy",
+            "rh.floc-places_challenge_space.npy",
+            "rh.floc-words_challenge_space.npy",
+            "rh.streams_challenge_space.npy",
+        ]
         self.lh_challenge_rois = []
         self.rh_challenge_rois = []
         for r in range(len(lh_challenge_roi_files)):
-            self.lh_challenge_rois.append(np.load(os.path.join(args.data_dir, 'roi_masks',
-                lh_challenge_roi_files[r])))
-            self.rh_challenge_rois.append(np.load(os.path.join(args.data_dir, 'roi_masks',
-                rh_challenge_roi_files[r])))
-
-
-    # def inverse_min_max_transform(self, arr, prefix='lh'):
-    #     if prefix == 'lh':
-    #         min_val, max_val = self.args.min_max_lh
-    #     else:
-    #         min_val, max_val = self.args.min_max_rh
-
-    #     arr = (arr + 1)/2
-
-    #     return arr * (max_val - min_val) + min_val
-
-    # def inverse_min_max_transform(self, arr, prefix='lh'):
-    #     if prefix == 'lh':
-    #         min_val, max_val = self.args.min_max_lh
-    #     else:
-    #         min_val, max_val = self.args.min_max_rh
-
-    #     return arr * max_val
-
-
-    def inverse_min_max_transform(self, arr, prefix='lh'):
-        return arr * 15
-
+            self.lh_challenge_rois.append(
+                np.load(
+                    os.path.join(args.data_dir, "roi_masks", lh_challenge_roi_files[r])
+                )
+            )
+            self.rh_challenge_rois.append(
+                np.load(
+                    os.path.join(args.data_dir, "roi_masks", rh_challenge_roi_files[r])
+                )
+            )
 
     def __call__(self, pred_lh_fmri, pred_rh_fmri, gt_lh_fmri, gt_rh_fmri):
-
-        pred_lh_fmri = self.inverse_min_max_transform(pred_lh_fmri, prefix='lh')
-        pred_rh_fmri = self.inverse_min_max_transform(pred_rh_fmri, prefix='rh')
-
-        gt_lh_fmri = self.inverse_min_max_transform(gt_lh_fmri, prefix='lh')
-        gt_rh_fmri = self.inverse_min_max_transform(gt_rh_fmri, prefix='rh')
 
         # Empty correlation array of shape: (LH vertices)
         lh_correlation = np.zeros(pred_lh_fmri.shape[1])
         # Correlate each predicted LH vertex with the corresponding ground truth vertex
         for v in range(pred_lh_fmri.shape[1]):
-            lh_correlation[v] = corr(pred_lh_fmri[:,v], gt_lh_fmri[:,v])[0]
+            lh_correlation[v] = corr(pred_lh_fmri[:, v], gt_lh_fmri[:, v])[0]
 
         # Empty correlation array of shape: (RH vertices)
         rh_correlation = np.zeros(pred_rh_fmri.shape[1])
         # Correlate each predicted RH vertex with the corresponding ground truth vertex
         for v in range(pred_rh_fmri.shape[1]):
-            rh_correlation[v] = corr(pred_rh_fmri[:,v], gt_rh_fmri[:,v])[0]
+            rh_correlation[v] = corr(pred_rh_fmri[:, v], gt_rh_fmri[:, v])[0]
 
         # Select the correlation results vertices of each ROI
         roi_names = []
@@ -139,32 +136,40 @@ class Metric:
         rh_roi_correlation = []
         for r1 in range(len(self.lh_challenge_rois)):
             for r2 in self.roi_name_maps[r1].items():
-                if r2[0] != 0: # zeros indicate to vertices falling outside the ROI of interest
+                if (
+                    r2[0] != 0
+                ):  # zeros indicate to vertices falling outside the ROI of interest
                     roi_names.append(r2[1])
                     lh_roi_idx = np.where(self.lh_challenge_rois[r1] == r2[0])[0]
                     rh_roi_idx = np.where(self.rh_challenge_rois[r1] == r2[0])[0]
                     lh_roi_correlation.append(lh_correlation[lh_roi_idx])
                     rh_roi_correlation.append(rh_correlation[rh_roi_idx])
-        roi_names.append('All vertices')
+        roi_names.append("All vertices")
         lh_roi_correlation.append(lh_correlation)
         rh_roi_correlation.append(rh_correlation)
 
         # Create the plot
-        lh_median_roi_correlation = [np.median(lh_roi_correlation[r])
-            for r in range(len(lh_roi_correlation))]
-        rh_median_roi_correlation = [np.median(rh_roi_correlation[r])
-            for r in range(len(rh_roi_correlation))]
+        lh_median_roi_correlation = [
+            np.median(lh_roi_correlation[r]) for r in range(len(lh_roi_correlation))
+        ]
+        rh_median_roi_correlation = [
+            np.median(rh_roi_correlation[r]) for r in range(len(rh_roi_correlation))
+        ]
 
+        lh_median_roi_correlation = np.array(lh_median_roi_correlation)
+        rh_median_roi_correlation = np.array(rh_median_roi_correlation)
 
-        avg = (lh_median_roi_correlation[-1] + rh_median_roi_correlation[-1])/2
+        lh_median_roi_correlation = lh_median_roi_correlation[~np.isnan(lh_median_roi_correlation)]
+        rh_median_roi_correlation = rh_median_roi_correlation[~np.isnan(rh_median_roi_correlation)]
 
-        return {
-            "corr": avg
-        }
+        avg = (lh_median_roi_correlation.mean() + rh_median_roi_correlation.mean()) / 2
+
+        return {"corr": avg}
 
 
 def get_model(args, distributed=True):
     from models.timm_model import AlgonautsTimm
+
     model = AlgonautsTimm(args)
 
     # move networks to gpu
@@ -203,7 +208,6 @@ def get_dataloader(args):
         ]
     )
 
-
     valid_transform = transforms.Compose(
         [
             transforms.Resize((args.img_size, args.img_size)),
@@ -220,7 +224,7 @@ def get_dataloader(args):
         transform=train_transform,
         fold=args.fold,
         num_folds=args.num_folds,
-        is_train=True
+        is_train=True,
     )
 
     valid_dataset = AlgonautsDataset(
@@ -229,7 +233,7 @@ def get_dataloader(args):
         transform=valid_transform,
         fold=args.fold,
         num_folds=args.num_folds,
-        is_train=False
+        is_train=False,
     )
 
     train_sampler = (
@@ -243,9 +247,8 @@ def get_dataloader(args):
         shuffle=train_sampler is None,
         num_workers=args.num_workers,
         pin_memory=True,
-        sampler=train_sampler
+        sampler=train_sampler,
     )
-
 
     valid_sampler = (
         torch.utils.data.distributed.DistributedSampler(valid_dataset)
@@ -258,9 +261,8 @@ def get_dataloader(args):
         shuffle=False,
         num_workers=args.num_workers,
         pin_memory=True,
-        sampler=valid_sampler
+        sampler=valid_sampler,
     )
-
 
     args.num_lh_output = train_dataset.num_lh_output
     args.num_rh_output = train_dataset.num_rh_output
@@ -449,9 +451,7 @@ def train_one_fold(args):
     print("Training time {}".format(total_time_str))
 
 
-
 def train(args):
-
     # args.distributed = True
 
     if "WORLD_SIZE" in os.environ:
@@ -474,6 +474,43 @@ def train(args):
         args.output_dir = f"{output_dir}/{fold}/"
         os.makedirs(args.output_dir, exist_ok=True)
         train_one_fold(args)
+
+
+def post_process_output(outputs, args):
+    subject_metadata = args.subject_metadata
+    pred_l, pred_r = None, None
+    counter_l, counter_r = None, None
+    for side in ["l", "r"]:
+        roi_names = outputs[side].keys()
+        for roi_name in roi_names:
+            pred = outputs[side][roi_name]
+            roi_idx = subject_metadata[side][roi_name]
+
+            batch_size = pred.shape[0]
+            
+            if side == 'l':
+                if pred_l is None:
+                    pred_l = np.zeros((batch_size, args.num_lh_output))
+                    counter_l = np.zeros((batch_size, args.num_lh_output))
+                # counter_l[roi_idx[np.where(pred_l[roi_idx] != 0)[0]]] += 1
+                counter_l += roi_idx
+                pred_l[:, np.where(roi_idx)[0]] += pred.detach().cpu().numpy()
+            else:
+                if pred_r is None:
+                    pred_r = np.zeros((batch_size, args.num_rh_output))
+                    counter_r = np.zeros((batch_size, args.num_rh_output))
+
+                counter_r += roi_idx
+                # counter_r[roi_idx[np.where(pred_r[roi_idx] != 0)[0]]] += 1
+                pred_r[:, np.where(roi_idx)[0]] += pred.detach().cpu().numpy()
+
+    # import pdb; pdb.set_trace()
+    counter_l[np.where(counter_l == 0)] = 1
+    counter_r[np.where(counter_r == 0)] = 1
+
+    pred_l = pred_l / counter_l
+    pred_r = pred_r / counter_r
+    return pred_l, pred_r
 
 
 def train_one_epoch(
@@ -518,12 +555,11 @@ def train_one_epoch(
             if not args.distributed:
                 loss = loss.mean()
 
-
             if not is_train:
-                pred_lh_fmri = outputs['lh_fmri'].detach().cpu().numpy()
-                pred_rh_fmri = outputs['rh_fmri'].detach().cpu().numpy()
-                gt_lh_fmri = batch['lh_fmri'].detach().cpu().numpy()
-                gt_rh_fmri = batch['rh_fmri'].detach().cpu().numpy()
+            # if True:
+                pred_lh_fmri, pred_rh_fmri = post_process_output(outputs, args)
+                gt_lh_fmri = batch["l"].detach().cpu().numpy()
+                gt_rh_fmri = batch["r"].detach().cpu().numpy()
 
                 pred_lh_fmris.append(pred_lh_fmri)
                 pred_rh_fmris.append(pred_rh_fmri)
@@ -559,11 +595,10 @@ def train_one_epoch(
         metric_logger.update(wd=optimizer.param_groups[0]["weight_decay"])
 
     if not is_train:
-
-                # pred_lh_fmris.append(pred_lh_fmri)
-                # pred_rh_fmris.append(pred_rh_fmri)
-                # gt_lh_fmris.append(gt_lh_fmri)
-                # gt_rh_fmris.append(gt_rh_fmri)
+        # pred_lh_fmris.append(pred_lh_fmri)
+        # pred_rh_fmris.append(pred_rh_fmri)
+        # gt_lh_fmris.append(gt_lh_fmri)
+        # gt_rh_fmris.append(gt_rh_fmri)
         pred_lh_fmris = np.concatenate(pred_lh_fmris, axis=0)
         pred_rh_fmris = np.concatenate(pred_rh_fmris, axis=0)
         gt_lh_fmris = np.concatenate(gt_lh_fmris, axis=0)
@@ -581,6 +616,8 @@ def train_one_epoch(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Train algonauts", parents=[get_args_parser()])
     args = parser.parse_args()
+    with open("subject_meta.pkl", "rb") as f:
+        subject_metadata = pickle.load(f)
+        args.subject_metadata = subject_metadata[args.subject]
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     train(args)
-

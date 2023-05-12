@@ -204,8 +204,8 @@ class AlgonautsDataset(Dataset):
 
         return {
             "image": img,
-            "lh_fmri": lh_fmri,
-            "rh_fmri": rh_fmri
+            "l": lh_fmri,
+            "r": rh_fmri
         }
 
 

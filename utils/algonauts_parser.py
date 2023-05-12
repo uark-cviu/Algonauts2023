@@ -18,6 +18,7 @@ def get_args_parser():
     parser.add_argument("--dataset", default="Algonauts", type=str)
 
     parser.add_argument("--data_dir", default="data", type=str)
+    parser.add_argument("--subject", default="subj01", type=str)
     parser.add_argument(
         "--csv_file", default="data/5folds_splits.csv", type=str
     )
