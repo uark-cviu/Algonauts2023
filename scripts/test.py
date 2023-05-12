@@ -26,7 +26,14 @@ from tqdm import tqdm
 
 """
 command:
-python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema/subj01/convnext_base_in22ft1k/ --output_dir predictions/roi_pcc_l1_384_ema/
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema/subj01/convnext_base_in22ft1k/ --output_dir predictions/roi_pcc_l1_384_ema/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema/subj02/convnext_base_in22ft1k/ --output_dir predictions/roi_pcc_l1_384_ema/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema/subj03/convnext_base_in22ft1k/ --output_dir predictions/roi_pcc_l1_384_ema/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema/subj04/convnext_base_in22ft1k/ --output_dir predictions/roi_pcc_l1_384_ema/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema/subj05/convnext_base_in22ft1k/ --output_dir predictions/roi_pcc_l1_384_ema/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema/subj06/convnext_base_in22ft1k/ --output_dir predictions/roi_pcc_l1_384_ema/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema/subj07/convnext_base_in22ft1k/ --output_dir predictions/roi_pcc_l1_384_ema/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema/subj08/convnext_base_in22ft1k/ --output_dir predictions/roi_pcc_l1_384_ema/
 """
 
 
@@ -177,6 +184,9 @@ def train(args):
 
         pred_rh_final += pred_rh_fmris / len(folds)
         pred_lh_final += pred_lh_fmris / len(folds)
+
+    pred_lh_final = pred_lh_final.astype(np.float32)
+    pred_rh_final = pred_rh_final.astype(np.float32)
 
     print(pred_rh_final.min(), pred_rh_final.max())
     print(pred_lh_final.min(), pred_lh_final.max())

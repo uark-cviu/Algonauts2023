@@ -36,14 +36,38 @@ class Criterion(nn.Module):
         self.mse_loss = nn.MSELoss()
         self.pcc = PCCLoss()
 
+        self.adaptive_loss_dict = {}
+        for side in ['l', 'r']:
+            self.adaptive_loss_dict[side] = {}
+            roi_names = self.subject_metadata[side].keys()
+            for roi_name in roi_names:
+                num_output = self.subject_metadata[side][roi_name].sum()
+                loss_fn = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
+                    num_dims = num_output, float_dtype=np.float32, device='cuda:0'
+                )
+                self.adaptive_loss_dict[side][roi_name] = loss_fn
+
+        # self.adaptive_lh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
+        #     num_dims = args.num_lh_output, float_dtype=np.float32, device='cuda:0'
+        # )
+
+        # self.adaptive_rh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
+        #     num_dims = args.num_rh_output, float_dtype=np.float32, device='cuda:0'
+        # )
+
     def get_gt_roi(self, gt_fmri, side, roi_name):
         roi_idx = self.subject_metadata[side][roi_name]
         return gt_fmri[:, np.where(roi_idx)[0]]
 
-    def loss(self, pred, gt):
+    def loss(self, pred, gt, side, roi_name):
         pcc_loss = self.pcc(pred, gt)
-        l1_loss = self.l1_loss(pred, gt)
-        return pcc_loss + l1_loss
+        # l1_loss = self.l1_loss(pred, gt)
+        adaptive_loss = self.adaptive_loss(pred, gt, side, roi_name)
+        return pcc_loss + adaptive_loss
+    
+    def adaptive_loss(self, pred, gt, side, roi_name):
+        loss_fn = self.adaptive_loss_dict[side][roi_name]
+        return torch.mean(loss_fn.lossfun((pred - gt)))
 
     def forward(self, outputs, batch):
         total_loss = 0
@@ -56,7 +80,7 @@ class Criterion(nn.Module):
                 pred = outputs[side][roi_name]
                 # import pdb; pdb.set_trace()
                 gt = self.get_gt_roi(gt_fmri, side, roi_name)
-                loss = self.loss(pred, gt)
+                loss = self.loss(pred, gt, side, roi_name)
                 total_loss += loss
                 count += 1
 
