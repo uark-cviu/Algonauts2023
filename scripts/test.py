@@ -24,21 +24,25 @@ from datasets.algonauts_2023 import AlgonautsTestDataset
 from scipy.stats import pearsonr as corr
 from tqdm import tqdm
 
+"""
+command:
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema/subj01/convnext_base_in22ft1k/ --output_dir predictions/roi_pcc_l1_384_ema/
+"""
 
 
 def get_args_parser():
-    parser = argparse.ArgumentParser('Test', add_help=False)
+    parser = argparse.ArgumentParser("Test", add_help=False)
 
     # dataset parameters
-    parser.add_argument('--folds', default='0,1,2,3,4', type=str)
-    parser.add_argument('--checkpoint_dir', type=str, default='')
-    parser.add_argument('--output_dir', type=str, default='predictions')
+    parser.add_argument("--folds", default="0,1,2,3,4", type=str)
+    parser.add_argument("--checkpoint_dir", type=str, default="")
+    parser.add_argument("--output_dir", type=str, default="predictions")
     return parser
-
 
 
 def get_model(args):
     from models.timm_model import AlgonautsTimm
+
     model = AlgonautsTimm(args)
 
     # move networks to gpu
@@ -75,10 +79,47 @@ def get_dataloader(args):
         shuffle=False,
         num_workers=args.num_workers,
         pin_memory=True,
-        drop_last=False
+        drop_last=False,
     )
 
     return valid_loader
+
+
+def post_process_output(outputs, args):
+    subject_metadata = args.subject_metadata
+    pred_l, pred_r = None, None
+    counter_l, counter_r = None, None
+    for side in ["l", "r"]:
+        roi_names = outputs[side].keys()
+        for roi_name in roi_names:
+            pred = outputs[side][roi_name]
+            roi_idx = subject_metadata[side][roi_name]
+
+            batch_size = pred.shape[0]
+
+            if side == "l":
+                if pred_l is None:
+                    pred_l = np.zeros((batch_size, args.num_lh_output))
+                    counter_l = np.zeros((batch_size, args.num_lh_output))
+                # counter_l[roi_idx[np.where(pred_l[roi_idx] != 0)[0]]] += 1
+                counter_l += roi_idx
+                pred_l[:, np.where(roi_idx)[0]] += pred.detach().cpu().numpy()
+            else:
+                if pred_r is None:
+                    pred_r = np.zeros((batch_size, args.num_rh_output))
+                    counter_r = np.zeros((batch_size, args.num_rh_output))
+
+                counter_r += roi_idx
+                # counter_r[roi_idx[np.where(pred_r[roi_idx] != 0)[0]]] += 1
+                pred_r[:, np.where(roi_idx)[0]] += pred.detach().cpu().numpy()
+
+    # import pdb; pdb.set_trace()
+    counter_l[np.where(counter_l == 0)] = 1
+    counter_r[np.where(counter_r == 0)] = 1
+
+    pred_l = pred_l / counter_l
+    pred_r = pred_r / counter_r
+    return pred_l, pred_r
 
 
 def train(args):
@@ -97,12 +138,11 @@ def train(args):
     for fold in folds:
         checkpoint = f"{args.checkpoint_dir}/{fold}/best.pth"
         checkpoint = torch.load(checkpoint)
-        train_args = checkpoint['args']
+        train_args = checkpoint["args"]
         print(train_args)
-        best_score = checkpoint['best_score']
+        best_score = checkpoint["best_score"]
         subject_id = train_args.data_dir.split("/")[-1]
         print(f"[+] Predicting {fold} of {subject_id}, best score: {best_score}")
-
 
         if data_loader is None:
             data_loader = get_dataloader(train_args)
@@ -110,7 +150,7 @@ def train(args):
         # ============ building Clusformer ... ============
         model = get_model(train_args)
         # model.load_state_dict(checkpoint['model'])
-        model.load_state_dict(checkpoint['ema'])
+        model.load_state_dict(checkpoint["ema"])
         model.eval()
 
         pred_rh_fmris = []
@@ -124,8 +164,10 @@ def train(args):
             with torch.no_grad():
                 outputs = model(batch)
 
-                pred_lh_fmri = outputs['lh_fmri'].detach().cpu().numpy()
-                pred_rh_fmri = outputs['rh_fmri'].detach().cpu().numpy()
+                pred_lh_fmri, pred_rh_fmri = post_process_output(outputs, train_args)
+
+                # pred_lh_fmri = outputs["lh_fmri"].detach().cpu().numpy()
+                # pred_rh_fmri = outputs["rh_fmri"].detach().cpu().numpy()
 
                 pred_lh_fmris.append(pred_lh_fmri)
                 pred_rh_fmris.append(pred_rh_fmri)
@@ -145,111 +187,8 @@ def train(args):
     np.save(f"{output_dir}/rh_pred_test.npy", pred_rh_final)
 
 
-def train_one_epoch(
-    model,
-    model_ema,
-    criterion,
-    data_loader,
-    optimizer,
-    scheduler,
-    epoch,
-    fp16_scaler,
-    is_train,
-    args,
-):
-    if is_train:
-        model.train()
-        prefix = "TRAIN"
-    else:
-        model.eval()
-        prefix = "VALID"
-        metric_fn = Metric(args)
-        pred_lh_fmris = []
-        pred_rh_fmris = []
-        gt_lh_fmris = []
-        gt_rh_fmris = []
-    metric_logger = utils.MetricLogger(delimiter="  ")
-    header = "Epoch: [{}/{}]".format(epoch, args.epochs)
-
-    for batch in metric_logger.log_every(data_loader, 50, header):
-        for k, v in batch.items():
-            if isinstance(v, torch.Tensor):
-                batch[k] = batch[k].cuda(non_blocking=True)
-
-        with torch.cuda.amp.autocast(fp16_scaler is not None):
-            if not is_train:
-                with torch.no_grad():
-                    outputs = model(batch)
-            else:
-                outputs = model(batch)
-
-            loss = criterion(outputs, batch)
-            if not args.distributed:
-                loss = loss.mean()
-
-
-            if not is_train:
-                pred_lh_fmri = outputs['lh_fmri'].detach().cpu().numpy()
-                pred_rh_fmri = outputs['rh_fmri'].detach().cpu().numpy()
-                gt_lh_fmri = batch['lh_fmri'].detach().cpu().numpy()
-                gt_rh_fmri = batch['rh_fmri'].detach().cpu().numpy()
-
-                pred_lh_fmris.append(pred_lh_fmri)
-                pred_rh_fmris.append(pred_rh_fmri)
-                gt_lh_fmris.append(gt_lh_fmri)
-                gt_rh_fmris.append(gt_rh_fmri)
-
-        if not math.isfinite(loss.item()):
-            print("Loss is {}, stopping training".format(loss.item()), force=True)
-            sys.exit(1)
-
-        if is_train:
-            # student update
-            optimizer.zero_grad()
-            if fp16_scaler is None:
-                loss.backward()
-                optimizer.step()
-            else:
-                fp16_scaler.scale(loss).backward()
-                fp16_scaler.step(optimizer)
-                fp16_scaler.update()
-
-            if model_ema is not None:
-                model_ema.update(model)
-
-            scheduler.step()
-
-        # logging
-        torch.cuda.synchronize()
-        metric_logger.update(loss=loss.item())
-        # for k, v in metric_dict.items():
-        #     metric_logger.update(**{k: v})
-        metric_logger.update(lr=optimizer.param_groups[0]["lr"])
-        metric_logger.update(wd=optimizer.param_groups[0]["weight_decay"])
-
-    if not is_train:
-
-                # pred_lh_fmris.append(pred_lh_fmri)
-                # pred_rh_fmris.append(pred_rh_fmri)
-                # gt_lh_fmris.append(gt_lh_fmri)
-                # gt_rh_fmris.append(gt_rh_fmri)
-        pred_lh_fmris = np.concatenate(pred_lh_fmris, axis=0)
-        pred_rh_fmris = np.concatenate(pred_rh_fmris, axis=0)
-        gt_lh_fmris = np.concatenate(gt_lh_fmris, axis=0)
-        gt_rh_fmris = np.concatenate(gt_rh_fmris, axis=0)
-        metric_dict = metric_fn(pred_lh_fmris, pred_rh_fmris, gt_lh_fmris, gt_rh_fmris)
-        for k, v in metric_dict.items():
-            metric_logger.update(**{k: v})
-    # gather the stats from all processes
-    if args.distributed:
-        metric_logger.synchronize_between_processes()
-    print(f"[{prefix}] Averaged stats:", metric_logger)
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Test algonauts", parents=[get_args_parser()])
     args = parser.parse_args()
     # Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     train(args)
-
