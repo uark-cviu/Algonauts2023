@@ -46,7 +46,7 @@ model_name='convnext_base_in22ft1k'
 batch_size=32
 lr=2.5e-4
 distributed=True
-epochs=30
+epochs=15
 img_size=384
 saveckp_freq=5
 
@@ -55,6 +55,8 @@ saveckp_freq=5
 
 if [ "$RUN_MODE" = "dist" ]; then
         command="python -u -m torch.distributed.launch --nproc_per_node=${NGPUS} --master_port ${MASTER_PORT}"
+elif [ "$RUN_MODE" = "dist_new" ]; then
+        command="torchrun --nproc_per_node=${NGPUS} --master_port ${MASTER_PORT}"
 elif [ "$RUN_MODE" = "slurm" ]; then
         command="srun -p ${PARTITION} \
                 --job-name ${JOB_NAME} \
@@ -73,9 +75,9 @@ fi
 echo "Run command ", $command
 
 # output_dir=logs/baseline_pcc_l1/${subject}/${model_name}/
-output_dir=/scr1/1576189/logs/baseline_pcc_l1_384_ema_adaptive_loss/${subject}/${model_name}/
+output_dir=/scr1/1594489/logs/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/${model_name}/
 # data_dir=/scratch/1576189/data
-data_dir=data/${subject}
+data_dir=data/
 csv_file=${data_dir}/kfold.csv
 
 PYTHONPATH=. $command \

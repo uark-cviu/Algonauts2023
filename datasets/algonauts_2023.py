@@ -115,6 +115,9 @@ class AlgonautsDataset(Dataset):
             self.num_lh_output = 18981
             self.num_rh_output = 20530
 
+        self.max_lh_length = 19004
+        self.max_rh_length = 20544
+
         if subject == 'subj01':
             self.min_max_lh = [-5.5488534, 6.3958163]
             self.min_max_rh = [-6.224722, 6.2803955]
@@ -167,21 +170,22 @@ class AlgonautsDataset(Dataset):
                 self.fmri_dict[subject_id][prefix] = fmri_data
 
         return fmri_data[index]
+    
+    def pad_if_needed(self, data, prefix='lh'):
+        if prefix == 'lh':
+            max_data = self.max_lh_length
+        else:
+            max_data = self.max_rh_length
 
-    # def min_max_transform(self, arr, prefix='lh'):
-    #     if prefix == 'lh':
-    #         min_val, max_val = self.min_max_lh
-    #     else:
-    #         min_val, max_val = self.min_max_rh
-    #     return 2 * (arr - min_val) / (max_val - min_val) - 1
+        length = len(data)
+        if length < max_data:
+            pad_val = data[-1]
+            pad_data = np.ones((max_data, )) * pad_val
+            pad_data[:length] = data
+        else:
+            pad_data = data
 
-    # def min_max_transform(self, arr, prefix='lh'):
-    #     if prefix == 'lh':
-    #         min_val, max_val = self.min_max_lh
-    #     else:
-    #         min_val, max_val = self.min_max_rh
-    #     return arr / max_val
-
+        return pad_data
 
     def min_max_transform(self, arr, prefix='lh'):
         return arr
@@ -196,9 +200,11 @@ class AlgonautsDataset(Dataset):
         img = self.load_image(img_path)
         lh_fmri = self.load_fmri(img_path, prefix='lh')
         lh_fmri = self.min_max_transform(lh_fmri, prefix='lh')
+        lh_fmri = self.pad_if_needed(lh_fmri, prefix='lh')
 
         rh_fmri = self.load_fmri(img_path, prefix='rh')
         rh_fmri = self.min_max_transform(rh_fmri, prefix='rh')
+        rh_fmri = self.pad_if_needed(rh_fmri, prefix='rh')
         if self.transform:
             img = self.transform(img)
 
@@ -279,21 +285,6 @@ class AlgonautsTestDataset(Dataset):
                 self.fmri_dict[subject_id][prefix] = fmri_data
 
         return fmri_data[index]
-
-    # def min_max_transform(self, arr, prefix='lh'):
-    #     if prefix == 'lh':
-    #         min_val, max_val = self.min_max_lh
-    #     else:
-    #         min_val, max_val = self.min_max_rh
-    #     return 2 * (arr - min_val) / (max_val - min_val) - 1
-
-    # def min_max_transform(self, arr, prefix='lh'):
-    #     if prefix == 'lh':
-    #         min_val, max_val = self.min_max_lh
-    #     else:
-    #         min_val, max_val = self.min_max_rh
-    #     return arr / max_val
-
 
     def min_max_transform(self, arr, prefix='lh'):
         return arr
