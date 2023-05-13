@@ -377,8 +377,10 @@ def train_one_fold(args):
             )
 
             current_score = max(valid_stats["corr"], ema_valid_stats["corr"])
+            is_ema_better = ema_valid_stats["corr"] > valid_stats["corr"]
         else:
             current_score = valid_stats["corr"]
+            is_ema_better = None
 
         if current_score > best_score:
             best_score = current_score
@@ -402,7 +404,8 @@ def train_one_fold(args):
         }
 
         if model_ema is not None:
-            save_dict["ema"] = model_ema.state_dict()
+            if is_ema_better:
+                save_dict["model"] = model_ema.state_dict()
 
         if fp16_scaler is not None:
             save_dict["fp16_scaler"] = fp16_scaler.state_dict()
