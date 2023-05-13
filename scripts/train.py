@@ -33,13 +33,13 @@ class Criterion(nn.Module):
         self.l1_loss = nn.SmoothL1Loss()
         self.mse_loss = nn.MSELoss()
         self.pcc = PCCLoss()
-        # self.adaptive_lh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
-        #     num_dims = args.num_lh_output, float_dtype=np.float32, device='cuda:0'
-        # )
+        self.adaptive_lh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
+            num_dims = args.num_lh_output, float_dtype=np.float32, device='cuda:0'
+        )
 
-        # self.adaptive_rh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
-        #     num_dims = args.num_rh_output, float_dtype=np.float32, device='cuda:0'
-        # )
+        self.adaptive_rh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
+            num_dims = args.num_rh_output, float_dtype=np.float32, device='cuda:0'
+        )
 
     def forward(self, outputs, batch):
         pred_lh_fmri = outputs['lh_fmri']
@@ -47,10 +47,10 @@ class Criterion(nn.Module):
         gt_lh_fmri = batch['lh_fmri']
         gt_rh_fmri = batch['rh_fmri']
 
-        l1_loss = self.l1_loss(pred_lh_fmri, gt_lh_fmri) + self.l1_loss(pred_rh_fmri, gt_rh_fmri)
-        # loss_lh = torch.mean(self.adaptive_lh.lossfun((pred_lh_fmri - gt_lh_fmri)))
-        # loss_rh = torch.mean(self.adaptive_rh.lossfun((pred_rh_fmri - gt_rh_fmri)))
-        # l1_loss = loss_lh + loss_rh
+        # l1_loss = self.l1_loss(pred_lh_fmri, gt_lh_fmri) + self.l1_loss(pred_rh_fmri, gt_rh_fmri)
+        loss_lh = torch.mean(self.adaptive_lh.lossfun((pred_lh_fmri - gt_lh_fmri)))
+        loss_rh = torch.mean(self.adaptive_rh.lossfun((pred_rh_fmri - gt_rh_fmri)))
+        l1_loss = loss_lh + loss_rh
         pcc_loss = self.pcc(pred_lh_fmri, gt_lh_fmri) + self.pcc(pred_rh_fmri, gt_rh_fmri)
         loss = l1_loss + pcc_loss
         # import pdb; pdb.set_trace()
@@ -218,7 +218,6 @@ def get_dataloader(args):
     valid_datasets = []
     data_dir = args.data_dir
     for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj07']:
-    # for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj06', 'subj07', 'subj08']:
         args.data_dir = f"{data_dir}/{subject}"
         train_dataset = AlgonautsDataset(
             data_dir=args.data_dir,
@@ -274,11 +273,8 @@ def get_dataloader(args):
     )
 
 
-    # args.num_lh_output = train_dataset.num_lh_output
-    # args.num_rh_output = train_dataset.num_rh_output
-
-    args.num_lh_output = train_dataset.max_lh_length
-    args.num_rh_output = train_dataset.max_rh_length
+    args.num_lh_output = train_dataset.num_lh_output
+    args.num_rh_output = train_dataset.num_rh_output
 
     args.min_max_lh = train_dataset.min_max_lh
     args.min_max_rh = train_dataset.min_max_rh
