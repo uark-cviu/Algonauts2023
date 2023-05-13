@@ -405,6 +405,7 @@ def train_one_fold(args):
 
         if model_ema is not None:
             if is_ema_better:
+                print("EMA is better")
                 save_dict["model"] = model_ema.state_dict()
 
         if fp16_scaler is not None:
@@ -455,7 +456,8 @@ def train(args):
 
     output_dir = args.output_dir
 
-    for fold in [0, 1, 2, 3, 4]:
+    folds = args.folds.split(",")
+    for fold in folds:
         print("training fold ", fold)
         args.fold = fold
         args.output_dir = f"{output_dir}/{fold}/"
