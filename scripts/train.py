@@ -34,11 +34,11 @@ class Criterion(nn.Module):
         self.mse_loss = nn.MSELoss()
         self.pcc = PCCLoss()
         self.adaptive_lh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
-            num_dims = args.num_lh_output, float_dtype=np.float32, device='cuda:0'
+            num_dims = args.num_lh_output, float_dtype=np.float32, device=f'cuda:{args.gpu}'
         )
 
         self.adaptive_rh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
-            num_dims = args.num_rh_output, float_dtype=np.float32, device='cuda:0'
+            num_dims = args.num_rh_output, float_dtype=np.float32, device=f'cuda:{args.gpu}'
         )
 
     def forward(self, outputs, batch):
