@@ -26,6 +26,7 @@ GPUS_PER_NODE=${GPUS_PER_NODE:-1}
 CPUS_PER_TASK=${CPUS_PER_TASK:-4}
 NODE_LIST=${NODE_LIST:-'c1905'}
 
+FOLDS=${FOLDS:-"0,1,2,3,4"}
 RUN_MODE=${RUN_MODE:-"dist"}
 SUBJECT=${SUBJECT:-"subj01"}
 subject=${SUBJECT}
@@ -74,6 +75,8 @@ fi
 
 echo "Run command ", $command
 
+# CUDA_VISIBLE_DEVICES=4 NGPUS=1 bash bin/train_algonauts.sh 2>&1 | tee fold_1.txt &
+
 # output_dir=logs/baseline_pcc_l1/${subject}/${model_name}/
 output_dir=/scr1/1594489/logs/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/${model_name}/
 # data_dir=/scratch/1576189/data
@@ -94,4 +97,5 @@ PYTHONPATH=. $command \
         --saveckp_freq ${saveckp_freq} \
         --num_workers 4 \
         --use_fp16 False \
+        --folds ${FOLDS} \
         --use_ema True

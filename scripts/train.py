@@ -458,6 +458,7 @@ def train(args):
 
     folds = args.folds.split(",")
     for fold in folds:
+        fold = int(fold)
         print("training fold ", fold)
         args.fold = fold
         args.output_dir = f"{output_dir}/{fold}/"
