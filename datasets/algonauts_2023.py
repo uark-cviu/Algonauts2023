@@ -216,7 +216,7 @@ class AlgonautsDataset(Dataset):
         img = self.load_image(img_path)
         lh_fmri = self.load_fmri(img_path, prefix='lh')
         lh_fmri = self.min_max_transform(lh_fmri, prefix='lh')
-        lh_frmi = self.pad_if_needed(lh_frmi, prefix='lh')
+        lh_fmri = self.pad_if_needed(lh_fmri, prefix='lh')
 
         rh_fmri = self.load_fmri(img_path, prefix='rh')
         rh_fmri = self.min_max_transform(rh_fmri, prefix='rh')
