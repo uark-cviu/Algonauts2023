@@ -105,6 +105,7 @@ class AlgonautsDataset(Dataset):
         self.fmri_dict = {}
 
         subject = data_dir.split("/")[-1]
+        self.subject_id = int(subject[-1]) - 1
         if subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj07']:
             self.num_lh_output = 19004
             self.num_rh_output = 20544
@@ -227,7 +228,8 @@ class AlgonautsDataset(Dataset):
         return {
             "image": img,
             "lh_fmri": lh_fmri,
-            "rh_fmri": rh_fmri
+            "rh_fmri": rh_fmri,
+            "subject": self.subject_id
         }
 
 
@@ -238,6 +240,7 @@ class AlgonautsTestDataset(Dataset):
         self.transform = transform
 
         subject = data_dir.split("/")[-1]
+        self.subject_id = int(subject[-1]) - 1
 
         if subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj07']:
             self.num_lh_output = 19004
@@ -318,4 +321,5 @@ class AlgonautsTestDataset(Dataset):
 
         return {
             "image": img,
+            "subject": self.subject_id
         }

@@ -217,8 +217,8 @@ def get_dataloader(args):
     train_datasets = []
     valid_datasets = []
     data_dir = args.data_dir
-    for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj07']:
-    # for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj06', 'subj07', 'subj08']:
+    # for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj07']:
+    for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj06', 'subj07', 'subj08']:
         args.data_dir = f"{data_dir}/{subject}"
         train_dataset = AlgonautsDataset(
             data_dir=args.data_dir,
