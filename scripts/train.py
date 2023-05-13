@@ -90,36 +90,7 @@ class Metric:
                 rh_challenge_roi_files[r])))
 
 
-    # def inverse_min_max_transform(self, arr, prefix='lh'):
-    #     if prefix == 'lh':
-    #         min_val, max_val = self.args.min_max_lh
-    #     else:
-    #         min_val, max_val = self.args.min_max_rh
-
-    #     arr = (arr + 1)/2
-
-    #     return arr * (max_val - min_val) + min_val
-
-    # def inverse_min_max_transform(self, arr, prefix='lh'):
-    #     if prefix == 'lh':
-    #         min_val, max_val = self.args.min_max_lh
-    #     else:
-    #         min_val, max_val = self.args.min_max_rh
-
-    #     return arr * max_val
-
-
-    def inverse_min_max_transform(self, arr, prefix='lh'):
-        return arr * 15
-
-
     def __call__(self, pred_lh_fmri, pred_rh_fmri, gt_lh_fmri, gt_rh_fmri):
-
-        pred_lh_fmri = self.inverse_min_max_transform(pred_lh_fmri, prefix='lh')
-        pred_rh_fmri = self.inverse_min_max_transform(pred_rh_fmri, prefix='rh')
-
-        gt_lh_fmri = self.inverse_min_max_transform(gt_lh_fmri, prefix='lh')
-        gt_rh_fmri = self.inverse_min_max_transform(gt_rh_fmri, prefix='rh')
 
         # Empty correlation array of shape: (LH vertices)
         lh_correlation = np.zeros(pred_lh_fmri.shape[1])
@@ -157,10 +128,7 @@ class Metric:
 
 
         avg = (lh_median_roi_correlation[-1] + rh_median_roi_correlation[-1])/2
-
-        return {
-            "corr": avg
-        }
+        return avg
 
 
 def get_model(args, distributed=True):
@@ -216,10 +184,11 @@ def get_dataloader(args):
 
     train_datasets = []
     valid_datasets = []
-    data_dir = args.data_dir
+    root_data_dir = args.data_dir
+    args.root_data_dir = root_data_dir
     # for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj07']:
     for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj06', 'subj07', 'subj08']:
-        args.data_dir = f"{data_dir}/{subject}"
+        args.data_dir = f"{root_data_dir}/{subject}"
         train_dataset = AlgonautsDataset(
             data_dir=args.data_dir,
             csv_file=args.csv_file,
@@ -509,11 +478,11 @@ def train_one_epoch(
     else:
         model.eval()
         prefix = "VALID"
-        metric_fn = Metric(args)
         pred_lh_fmris = []
         pred_rh_fmris = []
         gt_lh_fmris = []
         gt_rh_fmris = []
+        subject_ids = []
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = "Epoch: [{}/{}]".format(epoch, args.epochs)
 
@@ -539,11 +508,13 @@ def train_one_epoch(
                 pred_rh_fmri = outputs['rh_fmri'].detach().cpu().numpy()
                 gt_lh_fmri = batch['lh_fmri'].detach().cpu().numpy()
                 gt_rh_fmri = batch['rh_fmri'].detach().cpu().numpy()
+                subject_id = batch['subject'].detach().cpu().numpy()
 
                 pred_lh_fmris.append(pred_lh_fmri)
                 pred_rh_fmris.append(pred_rh_fmri)
                 gt_lh_fmris.append(gt_lh_fmri)
                 gt_rh_fmris.append(gt_rh_fmri)
+                subject_ids.append(subject_id)
 
         if not math.isfinite(loss.item()):
             print("Loss is {}, stopping training".format(loss.item()), force=True)
@@ -573,14 +544,50 @@ def train_one_epoch(
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
         metric_logger.update(wd=optimizer.param_groups[0]["weight_decay"])
 
+        # if is_train:
+        #     break
+
     if not is_train:
         pred_lh_fmris = np.concatenate(pred_lh_fmris, axis=0)
         pred_rh_fmris = np.concatenate(pred_rh_fmris, axis=0)
         gt_lh_fmris = np.concatenate(gt_lh_fmris, axis=0)
         gt_rh_fmris = np.concatenate(gt_rh_fmris, axis=0)
-        metric_dict = metric_fn(pred_lh_fmris, pred_rh_fmris, gt_lh_fmris, gt_rh_fmris)
-        for k, v in metric_dict.items():
-            metric_logger.update(**{k: v})
+        subject_ids = np.concatenate(subject_ids, axis=0)
+        # import pdb; pdb.set_trace()
+        root_data_dir = args.root_data_dir
+        subject_unique_id = np.unique(subject_ids)
+        total = 0
+        for subject in subject_unique_id:
+            subject_idx = np.where(subject_ids == subject)[0]
+            pred_lh_fmris_ = pred_lh_fmris[subject_idx]
+            pred_rh_fmris_ = pred_rh_fmris[subject_idx]
+            gt_lh_fmris_ = gt_lh_fmris[subject_idx]
+            gt_rh_fmris_ = gt_rh_fmris[subject_idx]
+
+            if subject + 1 == 6:
+                lh_length, rh_length = 18978, 20220
+            elif subject + 1 == 8:
+                lh_length, rh_length = 18981, 20530
+            else:
+                lh_length, rh_length = 19004, 20544
+
+            pred_lh_fmris_ = pred_lh_fmris_[:, :lh_length]
+            gt_lh_fmris_ = gt_lh_fmris_[:, :lh_length]
+
+            pred_rh_fmris_ = pred_rh_fmris_[:, :rh_length]
+            gt_rh_fmris_ = gt_rh_fmris_[:, :rh_length]
+
+            args.data_dir = f"{root_data_dir}/subj0{subject+1}"
+            metric_fn = Metric(args)
+
+            avg = metric_fn(pred_lh_fmris_, pred_rh_fmris_, gt_lh_fmris_, gt_rh_fmris_)
+            metric_logger.update(**{f'corr_{subject+1}': avg})
+            total += avg
+
+        total = total / len(subject_unique_id)
+        metric_logger.update(**{'corr': total})
+        # for k, v in metric_dict.items():
+        #     metric_logger.update(**{k: v})
     # gather the stats from all processes
     if args.distributed:
         metric_logger.synchronize_between_processes()
