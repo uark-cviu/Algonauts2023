@@ -42,9 +42,10 @@ class Criterion(nn.Module):
             roi_names = self.subject_metadata[side].keys()
             for roi_name in roi_names:
                 num_output = self.subject_metadata[side][roi_name].sum()
-                loss_fn = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
-                    num_dims = num_output, float_dtype=np.float32, device='cuda:0'
-                )
+                # loss_fn = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
+                #     num_dims = num_output, float_dtype=np.float32, device='cuda:0'
+                # )
+                loss_fn = self.l1_loss
                 self.adaptive_loss_dict[side][roi_name] = loss_fn
 
         # self.adaptive_lh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
@@ -61,9 +62,9 @@ class Criterion(nn.Module):
 
     def loss(self, pred, gt, side, roi_name):
         pcc_loss = self.pcc(pred, gt)
-        # l1_loss = self.l1_loss(pred, gt)
-        adaptive_loss = self.adaptive_loss(pred, gt, side, roi_name)
-        return pcc_loss + adaptive_loss
+        l1_loss = self.l1_loss(pred, gt)
+        # adaptive_loss = self.adaptive_loss(pred, gt, side, roi_name)
+        return pcc_loss + l1_loss
     
     def adaptive_loss(self, pred, gt, side, roi_name):
         loss_fn = self.adaptive_loss_dict[side][roi_name]
@@ -227,6 +228,7 @@ def get_dataloader(args):
             transforms.Resize((args.img_size, args.img_size)),
             # transforms.RandomResizedCrop(args.img_size),
             # transforms.RandomHorizontalFlip(),
+            # transforms.AutoAugment(),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ]
@@ -364,6 +366,11 @@ def train_one_fold(args):
     for epoch in range(start_epoch, args.epochs):
         if args.distributed:
             train_loader.sampler.set_epoch(epoch)
+
+        # if epoch <= 2:
+        #     model.module.freeze_backbone()
+        # else:
+        #     model.module.unfreeze_backbone()
 
         # ============ training one epoch ... ============
         train_stats = train_one_epoch(

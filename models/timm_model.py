@@ -26,6 +26,14 @@ class AlgonautsTimm(nn.Module):
                     fc[roi_name] = nn.Linear(in_features, roi_size)
             self.fc[side] = fc
 
+    def freeze_backbone(self):
+        for param in self.backbone.parameters():
+            param.requires_grad = False
+
+    def unfreeze_backbone(self):
+        for param in self.backbone.parameters():
+            param.requires_grad = True
+
     def forward(self, batch):
         image = batch["image"]
         features = self.backbone(image)
