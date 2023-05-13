@@ -218,6 +218,7 @@ def get_dataloader(args):
     valid_datasets = []
     data_dir = args.data_dir
     for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj07']:
+    # for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj06', 'subj07', 'subj08']:
         args.data_dir = f"{data_dir}/{subject}"
         train_dataset = AlgonautsDataset(
             data_dir=args.data_dir,
@@ -273,8 +274,11 @@ def get_dataloader(args):
     )
 
 
-    args.num_lh_output = train_dataset.num_lh_output
-    args.num_rh_output = train_dataset.num_rh_output
+    # args.num_lh_output = train_dataset.num_lh_output
+    # args.num_rh_output = train_dataset.num_rh_output
+
+    args.num_lh_output = train_dataset.max_lh_length
+    args.num_rh_output = train_dataset.max_rh_length
 
     args.min_max_lh = train_dataset.min_max_lh
     args.min_max_rh = train_dataset.min_max_rh

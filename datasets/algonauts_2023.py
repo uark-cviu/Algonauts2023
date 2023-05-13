@@ -115,6 +115,9 @@ class AlgonautsDataset(Dataset):
             self.num_lh_output = 18981
             self.num_rh_output = 20530
 
+        self.max_lh_length = 19004
+        self.max_rh_length = 20544
+
         if subject == 'subj01':
             self.min_max_lh = [-5.5488534, 6.3958163]
             self.min_max_rh = [-6.224722, 6.2803955]
@@ -183,6 +186,23 @@ class AlgonautsDataset(Dataset):
     #     return arr / max_val
 
 
+    def pad_if_needed(self, data, prefix='lh'):
+        if prefix == 'lh':
+            max_data = self.max_lh_length
+        else:
+            max_data = self.max_rh_length
+
+        length = len(data)
+        if length < max_data:
+            pad_val = data[-1]
+            pad_data = np.ones((max_data, )) * pad_val
+            pad_data[:length] = data
+        else:
+            pad_data = data
+
+        return pad_data
+
+
     def min_max_transform(self, arr, prefix='lh'):
         return arr
 
@@ -196,9 +216,11 @@ class AlgonautsDataset(Dataset):
         img = self.load_image(img_path)
         lh_fmri = self.load_fmri(img_path, prefix='lh')
         lh_fmri = self.min_max_transform(lh_fmri, prefix='lh')
+        lh_frmi = self.pad_if_needed(lh_frmi, prefix='lh')
 
         rh_fmri = self.load_fmri(img_path, prefix='rh')
         rh_fmri = self.min_max_transform(rh_fmri, prefix='rh')
+        rh_fmri = self.pad_if_needed(rh_fmri, prefix='rh')
         if self.transform:
             img = self.transform(img)
 
