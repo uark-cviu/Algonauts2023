@@ -201,7 +201,7 @@ class AlgonautsDataset(Dataset):
         else:
             pad_data = data
 
-        return pad_data
+        return pad_data.astype(np.float32)
 
 
     def min_max_transform(self, arr, prefix='lh'):

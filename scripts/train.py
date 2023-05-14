@@ -189,6 +189,7 @@ def get_dataloader(args):
     # for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj07']:
     for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj06', 'subj07', 'subj08']:
         args.data_dir = f"{root_data_dir}/{subject}"
+        args.csv_file = f"{args.data_dir}/kfold.csv"
         train_dataset = AlgonautsDataset(
             data_dir=args.data_dir,
             csv_file=args.csv_file,
@@ -206,6 +207,8 @@ def get_dataloader(args):
             num_folds=args.num_folds,
             is_train=False
         )
+
+        print(len(train_dataset), len(valid_dataset))
 
         train_datasets.append(train_dataset)
         valid_datasets.append(valid_dataset)
