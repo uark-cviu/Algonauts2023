@@ -37,8 +37,11 @@ export MASTER_PORT=$MASTER_PORT
 export OFFSET=${OFFSET}
 
 # model_name='vit_small_patch16_224'
-model_name='convnext_base_in22ft1k'
-# model_name='tf_efficientnet_b5_ns'
+# model_name='convnext_base_in22ft1k'
+model_name='seresnext101d_32x8d'
+# model_name='maxvit_large_tf_384.in21k_ft_in1k'
+# model_name='tf_efficientnet_b7.ns_jft_in1k'
+# model_name='resnetrs420'
 # model_name='maxvit_base_tf_384.in21k_ft_in1k'
 # model_name='eva_giant_patch14_224.clip_ft_in1k'
 # model_name='ssl_resnext50_32x4d'
@@ -75,7 +78,11 @@ fi
 
 echo "Run command ", $command
 
-# CUDA_VISIBLE_DEVICES=4 NGPUS=1 bash bin/train_algonauts.sh 2>&1 | tee fold_1.txt &
+# CUDA_VISIBLE_DEVICES=0 FOLDS=0 NGPUS=1 RUN_MODE=dist_new bash bin/train_algonauts.sh 2>&1 | tee fold_0.txt &
+# CUDA_VISIBLE_DEVICES=1 FOLDS=1 NGPUS=1 RUN_MODE=dist_new bash bin/train_algonauts.sh 2>&1 | tee fold_1.txt &
+# CUDA_VISIBLE_DEVICES=2 FOLDS=2 NGPUS=1 RUN_MODE=dist_new bash bin/train_algonauts.sh 2>&1 | tee fold_2.txt &
+# CUDA_VISIBLE_DEVICES=3 FOLDS=3 NGPUS=1 RUN_MODE=dist_new bash bin/train_algonauts.sh 2>&1 | tee fold_3.txt &
+# CUDA_VISIBLE_DEVICES=4 FOLDS=4 NGPUS=1 RUN_MODE=dist_new bash bin/train_algonauts.sh 2>&1 | tee fold_4.txt &
 
 # output_dir=logs/baseline_pcc_l1/${subject}/${model_name}/
 output_dir=/scr1/1594489/logs/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/${model_name}/
