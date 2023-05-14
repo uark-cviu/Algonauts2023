@@ -26,8 +26,8 @@ from tqdm import tqdm
 
 
 """
-CUDA_VISIBLE_DEVICES=1 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/seresnext101d_32x8d/ --output_dir predictions/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/ --subject subj01 && \\
-CUDA_VISIBLE_DEVICES=1 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/seresnext101d_32x8d/ --output_dir predictions/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/ --subject subj02 && \\
+CUDA_VISIBLE_DEVICES=5 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/convnext_base_in22ft1k/ --output_dir predictions/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/convnext_base_in22ft1k --subject subj01 && \\
+CUDA_VISIBLE_DEVICES=1 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/convnext_base_in22ft1k/ --output_dir predictions/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/convnext_base_in22ft1k --subject subj02 && \\
 CUDA_VISIBLE_DEVICES=1 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/seresnext101d_32x8d/ --output_dir predictions/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/ --subject subj03 && \\
 CUDA_VISIBLE_DEVICES=1 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/seresnext101d_32x8d/ --output_dir predictions/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/ --subject subj04 && \\
 CUDA_VISIBLE_DEVICES=1 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/seresnext101d_32x8d/ --output_dir predictions/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/ --subject subj05 && \\
@@ -104,12 +104,11 @@ def train(args):
     # ============ preparing data ... ============
     # train_loader, valid_loader = get_dataloader(args)
 
-    data_loader = None
-
-    pred_rh_final = 0
-    pred_lh_final = 0
-
     for subject_id in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj06', 'subj07', 'subj08']:
+        data_loader = None
+
+        pred_rh_final = 0
+        pred_lh_final = 0
 
         for fold in folds:
             checkpoint = f"{args.checkpoint_dir}/{fold}/last.pth"
