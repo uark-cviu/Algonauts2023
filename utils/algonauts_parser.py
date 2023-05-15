@@ -13,6 +13,7 @@ def get_args_parser():
     parser.add_argument("--img_size", default=224, type=int)
     parser.add_argument("--patch_size", default=16, type=int)
     parser.add_argument("--is_train", default=True, type=utils.bool_flag)
+    parser.add_argument("--pretrained", default="logs/multisub/", type=str)
 
     # dataset
     parser.add_argument("--dataset", default="Algonauts", type=str)

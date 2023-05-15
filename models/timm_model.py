@@ -1,5 +1,6 @@
 import torch.nn as nn
 import timm
+import os
 import torch
 
 
@@ -10,6 +11,17 @@ class AlgonautsTimm(nn.Module):
         self.backbone = timm.create_model(
             model_name=args.model_name, pretrained=True, num_classes=0
         )
+
+        if os.path.isfile(args.pretrained):
+            checkpoint = torch.load(args.pretrained)['model']
+            backbone_dict = {}
+            for k, v in checkpoint.items():
+                if 'backbone' in k:
+                    k_ = k[7:].replace('backbone.', '')
+                    backbone_dict[k_] = v
+                
+            self.backbone.load_state_dict(backbone_dict)
+            print(f"[+] Loaded: ", args.pretrained)
 
         in_features = self.backbone.num_features
 

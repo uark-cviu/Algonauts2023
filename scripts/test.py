@@ -26,14 +26,14 @@ from tqdm import tqdm
 
 """
 command:
-python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_adaptive/subj01/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_adaptive_seresnext101d_32x8d/ && \
-python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_adaptive/subj02/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_adaptive_seresnext101d_32x8d/ && \
-python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_adaptive/subj03/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_adaptive_seresnext101d_32x8d/ && \
-python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_adaptive/subj04/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_adaptive_seresnext101d_32x8d/ && \
-python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_adaptive/subj05/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_adaptive_seresnext101d_32x8d/ && \
-python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_adaptive/subj06/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_adaptive_seresnext101d_32x8d/ && \
-python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_adaptive/subj07/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_adaptive_seresnext101d_32x8d/ && \
-python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_adaptive/subj08/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_adaptive_seresnext101d_32x8d/
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/subj01/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_ema_ft_backbone_seresnext101d_32x8d/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/subj02/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_ema_ft_backbone_seresnext101d_32x8d/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/subj03/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_ema_ft_backbone_seresnext101d_32x8d/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/subj04/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_ema_ft_backbone_seresnext101d_32x8d/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/subj05/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_ema_ft_backbone_seresnext101d_32x8d/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/subj06/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_ema_ft_backbone_seresnext101d_32x8d/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/subj07/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_ema_ft_backbone_seresnext101d_32x8d/ && \
+python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir /scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/subj08/seresnext101d_32x8d/ --output_dir predictions/roi_pcc_l1_384_ema_ft_backbone_seresnext101d_32x8d/
 """
 
 

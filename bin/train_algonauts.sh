@@ -85,6 +85,8 @@ output_dir=/scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/${subject}/${model_
 data_dir=data/${subject}
 csv_file=${data_dir}/kfold.csv
 
+pretrained=logs/multisub/${model_name}/
+
 PYTHONPATH=. $command \
         scripts/train.py \
         --model_name ${model_name} \
@@ -92,6 +94,7 @@ PYTHONPATH=. $command \
         --data_dir ${data_dir} \
         --subject ${SUBJECT} \
         --csv_file ${csv_file} \
+        --pretrained ${pretrained} \
         --batch_size_per_gpu ${batch_size} \
         --lr ${lr} \
         --img_size ${img_size} \
