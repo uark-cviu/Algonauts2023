@@ -141,7 +141,11 @@ class Metric:
                 )
             )
 
-    def __call__(self, pred_lh_fmri, pred_rh_fmri, gt_lh_fmri, gt_rh_fmri):
+
+    def pearson_corr(self):
+        return 0
+    # def __call__(self, pred_lh_fmri, pred_rh_fmri, gt_lh_fmri, gt_rh_fmri):
+    def __call__(self, pred_gt_dict):
 
         # Empty correlation array of shape: (LH vertices)
         lh_correlation = np.zeros(pred_lh_fmri.shape[1])
@@ -509,41 +513,38 @@ def train(args):
         train_one_fold(args)
 
 
+def post_process_output_side(outputs, subject_metadata, side):
+    pred_side = None
+    counter = None
+
+    num_output = args.num_lh_output if side == 'l' else args.num_rh_output
+
+    roi_names = outputs[side].keys()
+    for roi_name in roi_names:
+        pred = outputs[side][roi_name]
+        roi_idx = subject_metadata[side][roi_name]
+
+        batch_size = pred.shape[0]
+        
+        if pred_side is None:
+            pred_side = np.zeros((batch_size, num_output))
+            counter = np.zeros((batch_size, num_output))
+        counter += roi_idx
+        pred_side[:, np.where(roi_idx)[0]] += pred.detach().cpu().numpy()
+
+    counter[np.where(counter == 0)] = 1
+    pred_side = pred_side / counter
+    return pred_side
+
+
 def post_process_output(outputs, args):
     subject_metadata = args.subject_metadata
-    pred_l, pred_r = None, None
-    counter_l, counter_r = None, None
-    for side in ["l", "r"]:
-        roi_names = outputs[side].keys()
-        for roi_name in roi_names:
-            pred = outputs[side][roi_name]
-            roi_idx = subject_metadata[side][roi_name]
+    ret_dict = {}
+    for side in args.side:
+        pred_side = post_process_output_side(outputs, subject_metadata, side)
+        ret_dict[side] = pred_side
 
-            batch_size = pred.shape[0]
-            
-            if side == 'l':
-                if pred_l is None:
-                    pred_l = np.zeros((batch_size, args.num_lh_output))
-                    counter_l = np.zeros((batch_size, args.num_lh_output))
-                # counter_l[roi_idx[np.where(pred_l[roi_idx] != 0)[0]]] += 1
-                counter_l += roi_idx
-                pred_l[:, np.where(roi_idx)[0]] += pred.detach().cpu().numpy()
-            else:
-                if pred_r is None:
-                    pred_r = np.zeros((batch_size, args.num_rh_output))
-                    counter_r = np.zeros((batch_size, args.num_rh_output))
-
-                counter_r += roi_idx
-                # counter_r[roi_idx[np.where(pred_r[roi_idx] != 0)[0]]] += 1
-                pred_r[:, np.where(roi_idx)[0]] += pred.detach().cpu().numpy()
-
-    # import pdb; pdb.set_trace()
-    counter_l[np.where(counter_l == 0)] = 1
-    counter_r[np.where(counter_r == 0)] = 1
-
-    pred_l = pred_l / counter_l
-    pred_r = pred_r / counter_r
-    return pred_l, pred_r
+    return ret_dict
 
 
 def train_one_epoch(
@@ -565,10 +566,11 @@ def train_one_epoch(
         model.eval()
         prefix = "VALID"
         metric_fn = Metric(args)
-        pred_lh_fmris = []
-        pred_rh_fmris = []
-        gt_lh_fmris = []
-        gt_rh_fmris = []
+        pred_gt_dict = {}
+        for side in args.side:
+            pred_gt_dict[side] = {}
+            pred_gt_dict[side]['pred'] = []
+            pred_gt_dict[side]['gt'] = []
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = "Epoch: [{}/{}]".format(epoch, args.epochs)
 
@@ -590,14 +592,10 @@ def train_one_epoch(
 
             if not is_train:
             # if True:
-                pred_lh_fmri, pred_rh_fmri = post_process_output(outputs, args)
-                gt_lh_fmri = batch["l"].detach().cpu().numpy()
-                gt_rh_fmri = batch["r"].detach().cpu().numpy()
-
-                pred_lh_fmris.append(pred_lh_fmri)
-                pred_rh_fmris.append(pred_rh_fmri)
-                gt_lh_fmris.append(gt_lh_fmri)
-                gt_rh_fmris.append(gt_rh_fmri)
+                processed_pred = post_process_output(outputs, args)
+                for side in args.side:
+                    pred_gt_dict[side]['pred'].append(processed_pred[side])
+                    pred_gt_dict[side]['gt'].append(batch[side].detach().cpu().numpy())
 
         if not math.isfinite(loss.item()):
             print("Loss is {}, stopping training".format(loss.item()), force=True)
@@ -632,11 +630,14 @@ def train_one_epoch(
         # pred_rh_fmris.append(pred_rh_fmri)
         # gt_lh_fmris.append(gt_lh_fmri)
         # gt_rh_fmris.append(gt_rh_fmri)
-        pred_lh_fmris = np.concatenate(pred_lh_fmris, axis=0)
-        pred_rh_fmris = np.concatenate(pred_rh_fmris, axis=0)
-        gt_lh_fmris = np.concatenate(gt_lh_fmris, axis=0)
-        gt_rh_fmris = np.concatenate(gt_rh_fmris, axis=0)
-        metric_dict = metric_fn(pred_lh_fmris, pred_rh_fmris, gt_lh_fmris, gt_rh_fmris)
+        for side in args.side:
+            pred_gt_dict[side]['pred'] = np.concatenate(pred_gt_dict[side]['pred'], axis=0)
+            pred_gt_dict[side]['gt'] = np.concatenate(pred_gt_dict[side]['gt'], axis=0)
+        # pred_lh_fmris = np.concatenate(pred_lh_fmris, axis=0)
+        # pred_rh_fmris = np.concatenate(pred_rh_fmris, axis=0)
+        # gt_lh_fmris = np.concatenate(gt_lh_fmris, axis=0)
+        # gt_rh_fmris = np.concatenate(gt_rh_fmris, axis=0)
+        metric_dict = metric_fn(pred_gt_dict)
         for k, v in metric_dict.items():
             metric_logger.update(**{k: v})
     # gather the stats from all processes

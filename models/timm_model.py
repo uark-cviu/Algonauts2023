@@ -27,7 +27,8 @@ class AlgonautsTimm(nn.Module):
 
         subject_metadata = args.subject_metadata
 
-        self.side = ["l", "r"]
+        # self.side = ["l", "r"]
+        self.side = args.side # ["l", "r"]
         self.fc = nn.ModuleDict()
 
         for side in self.side:
