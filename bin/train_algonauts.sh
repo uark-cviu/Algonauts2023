@@ -87,8 +87,8 @@ output_dir=logs/stage2_lr/${subject}/${model_name}_${side}/
 data_dir=data/${subject}
 csv_file=${data_dir}/kfold.csv
 
-# pretrained=logs/multisub/${model_name}/
-pretrained=logs/stage1_lr/${SUBJECT}/${model_name}_l,r/
+pretrained=logs/multisub/${model_name}/
+# pretrained=logs/stage1_lr/${SUBJECT}/${model_name}_l,r/
 
 PYTHONPATH=. $command \
         scripts/train.py \
