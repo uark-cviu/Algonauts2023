@@ -81,7 +81,7 @@ fi
 echo "Run command ", $command
 
 # output_dir=logs/roi_pcc_l1_384_ema/${subject}/${model_name}/
-side='l'
+side='r'
 output_dir=logs/stage2_lr/${subject}/${model_name}_${side}/
 # data_dir=/scratch/1576189/data
 data_dir=data/${subject}
