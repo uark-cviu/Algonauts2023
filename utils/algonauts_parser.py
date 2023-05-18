@@ -25,5 +25,6 @@ def get_args_parser():
     )
     parser.add_argument("--num_folds", default=5, type=int)
     parser.add_argument("--fold", default=0, type=int)
+    parser.add_argument("--side", default='l,r', type=str)
 
     return parser

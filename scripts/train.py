@@ -73,7 +73,7 @@ class Criterion(nn.Module):
     def forward(self, outputs, batch):
         total_loss = 0
         count = 0
-        for side in ["l", "r"]:
+        for side in self.args.side:
             # GT
             gt_fmri = batch[side]
             roi_names = outputs[side].keys()
@@ -142,58 +142,52 @@ class Metric:
             )
 
 
-    def pearson_corr(self):
-        return 0
-    # def __call__(self, pred_lh_fmri, pred_rh_fmri, gt_lh_fmri, gt_rh_fmri):
-    def __call__(self, pred_gt_dict):
-
+    def pearson_corr(self, pred, gt, side):
         # Empty correlation array of shape: (LH vertices)
-        lh_correlation = np.zeros(pred_lh_fmri.shape[1])
+        correlation = np.zeros(pred.shape[1])
         # Correlate each predicted LH vertex with the corresponding ground truth vertex
-        for v in range(pred_lh_fmri.shape[1]):
-            lh_correlation[v] = corr(pred_lh_fmri[:, v], gt_lh_fmri[:, v])[0]
-
-        # Empty correlation array of shape: (RH vertices)
-        rh_correlation = np.zeros(pred_rh_fmri.shape[1])
-        # Correlate each predicted RH vertex with the corresponding ground truth vertex
-        for v in range(pred_rh_fmri.shape[1]):
-            rh_correlation[v] = corr(pred_rh_fmri[:, v], gt_rh_fmri[:, v])[0]
+        for v in range(pred.shape[1]):
+            correlation[v] = corr(pred[:, v], gt[:, v])[0]
 
         # Select the correlation results vertices of each ROI
         roi_names = []
-        lh_roi_correlation = []
-        rh_roi_correlation = []
+        roi_correlation = []
         for r1 in range(len(self.lh_challenge_rois)):
             for r2 in self.roi_name_maps[r1].items():
                 if (
                     r2[0] != 0
                 ):  # zeros indicate to vertices falling outside the ROI of interest
                     roi_names.append(r2[1])
-                    lh_roi_idx = np.where(self.lh_challenge_rois[r1] == r2[0])[0]
-                    rh_roi_idx = np.where(self.rh_challenge_rois[r1] == r2[0])[0]
-                    lh_roi_correlation.append(lh_correlation[lh_roi_idx])
-                    rh_roi_correlation.append(rh_correlation[rh_roi_idx])
+                    if side == 'l':
+                        roi_idx = np.where(self.lh_challenge_rois[r1] == r2[0])[0]
+                    else:
+                        roi_idx = np.where(self.rh_challenge_rois[r1] == r2[0])[0]
+                    roi_correlation.append(correlation[roi_idx])
         roi_names.append("All vertices")
-        lh_roi_correlation.append(lh_correlation)
-        rh_roi_correlation.append(rh_correlation)
+        roi_correlation.append(correlation)
 
         # Create the plot
-        lh_median_roi_correlation = [
-            np.median(lh_roi_correlation[r]) for r in range(len(lh_roi_correlation))
-        ]
-        rh_median_roi_correlation = [
-            np.median(rh_roi_correlation[r]) for r in range(len(rh_roi_correlation))
+        median_roi_correlation = [
+            np.median(roi_correlation[r]) for r in range(len(roi_correlation))
         ]
 
-        lh_median_roi_correlation = np.array(lh_median_roi_correlation)
-        rh_median_roi_correlation = np.array(rh_median_roi_correlation)
+        median_roi_correlation = np.array(median_roi_correlation)
 
-        lh_median_roi_correlation = lh_median_roi_correlation[~np.isnan(lh_median_roi_correlation)]
-        rh_median_roi_correlation = rh_median_roi_correlation[~np.isnan(rh_median_roi_correlation)]
+        median_roi_correlation = median_roi_correlation[~np.isnan(median_roi_correlation)]
 
-        avg = (lh_median_roi_correlation.mean() + rh_median_roi_correlation.mean()) / 2
+        avg = median_roi_correlation.mean()
 
-        return {"corr": avg}
+        return avg
+
+    def __call__(self, pred_gt_dict):
+        avg = 0
+        for side in self.args.side:
+            avg += self.pearson_corr(pred_gt_dict[side]['pred'], pred_gt_dict[side]['gt'], side)
+
+        avg = avg / len(self.args.side)
+        return {
+            'corr': avg
+        }
 
 
 def get_model(args, distributed=True):
@@ -478,8 +472,8 @@ def train_one_fold(args):
                 f.write(json.dumps(log_train_stats) + "\n")
                 f.write(json.dumps(log_valid_stats) + "\n")
 
-        # if best_score == 100:  # (args.subject != 0 and patient_counter == 15):
-        #     break
+        if patient_counter == 3:
+            break
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
@@ -508,7 +502,7 @@ def train(args):
         print("training fold ", fold)
         args.fold = fold
         args.output_dir = f"{output_dir}/{fold}/"
-        args.pretrained = f"{pretrained}/{fold}/last.pth"
+        args.pretrained = f"{pretrained}/{fold}/best.pth"
         os.makedirs(args.output_dir, exist_ok=True)
         train_one_fold(args)
 
@@ -653,5 +647,6 @@ if __name__ == "__main__":
     with open("subject_meta.pkl", "rb") as f:
         subject_metadata = pickle.load(f)
         args.subject_metadata = subject_metadata[args.subject]
+    args.side = args.side.split(",")
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     train(args)
