@@ -417,7 +417,7 @@ def train_one_fold(args):
         if is_save_best:
             utils.save_on_master(save_dict, os.path.join(args.output_dir, "best.pth"))
 
-        utils.save_on_master(save_dict, os.path.join(args.output_dir, "last.pth"))
+        # utils.save_on_master(save_dict, os.path.join(args.output_dir, "last.pth"))
 
         log_train_stats = {
             **{f"train_{k}": v for k, v in train_stats.items()},
@@ -432,8 +432,8 @@ def train_one_fold(args):
                 f.write(json.dumps(log_train_stats) + "\n")
                 f.write(json.dumps(log_valid_stats) + "\n")
 
-        # if best_score == 100:  # (args.subject != 0 and patient_counter == 15):
-        #     break
+        if patient_counter == 3:
+            break
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

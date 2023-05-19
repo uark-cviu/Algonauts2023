@@ -85,7 +85,7 @@ echo "Run command ", $command
 # CUDA_VISIBLE_DEVICES=4 FOLDS=4 NGPUS=1 RUN_MODE=dist_new bash bin/train_algonauts.sh 2>&1 | tee fold_4.txt &
 
 # output_dir=logs/baseline_pcc_l1/${subject}/${model_name}/
-output_dir=/scr1/1594489/logs/baseline_pcc_l1_384_ema_adaptive_loss_multisub0/${model_name}/
+output_dir=/scr1/1594489/logs/multisub/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/
 csv_file=${data_dir}/kfold.csv
