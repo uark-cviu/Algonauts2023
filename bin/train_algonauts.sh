@@ -47,10 +47,10 @@ model_name='seresnextaa101d_32x8d'
 # model_name='ssl_resnext50_32x4d'
 
 # Data
-batch_size=16
+batch_size=32
 lr=2.5e-4
 distributed=True
-epochs=12
+epochs=24
 img_size=384
 saveckp_freq=5
 

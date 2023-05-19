@@ -2,6 +2,7 @@ import torch.nn as nn
 import timm
 import os
 import torch
+from transformers import RobertaModel
 
 
 class AlgonautsTimm(nn.Module):
@@ -10,6 +11,14 @@ class AlgonautsTimm(nn.Module):
 
         self.backbone = timm.create_model(
             model_name=args.model_name, pretrained=True, num_classes=0
+        )
+
+        self.text_backbone = RobertaModel.from_pretrained("roberta-base")
+        text_num_features = 768
+        self.text_fc = nn.Sequential(
+            nn.Linear(text_num_features, text_num_features),
+            nn.ReLU(),
+            nn.Dropout(0.5)
         )
 
         if os.path.isfile(args.pretrained):
@@ -23,7 +32,7 @@ class AlgonautsTimm(nn.Module):
             self.backbone.load_state_dict(backbone_dict)
             print(f"[+] Loaded: ", args.pretrained)
 
-        in_features = self.backbone.num_features
+        in_features = self.backbone.num_features + text_num_features
 
         subject_metadata = args.subject_metadata
 
@@ -50,6 +59,20 @@ class AlgonautsTimm(nn.Module):
     def forward(self, batch):
         image = batch["image"]
         features = self.backbone(image)
+
+        input_ids, attention_mask = (
+            batch["ids"],
+            batch["mask"]        
+        )
+        output_1 = self.text_backbone(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+        )
+        hidden_state = output_1[0]
+        text_features = hidden_state[:, 0]
+        text_features = self.text_fc(text_features)
+
+        features = torch.cat([features, text_features], axis=-1)
 
         output_dict = {}
         for side in self.side:

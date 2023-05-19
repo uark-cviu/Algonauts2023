@@ -26,14 +26,24 @@ from tqdm import tqdm
 
 """
 command:
-CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/stage1_lr/subj01/seresnextaa101d_32x8d_l,r --output_dir predictions/stage1_lr_seresnextaa101d_32x8d/ && \
-CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/stage1_lr/subj02/seresnextaa101d_32x8d_l,r --output_dir predictions/stage1_lr_seresnextaa101d_32x8d/ && \
-CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/stage1_lr/subj03/seresnextaa101d_32x8d_l,r --output_dir predictions/stage1_lr_seresnextaa101d_32x8d/ && \
-CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/stage1_lr/subj04/seresnextaa101d_32x8d_l,r --output_dir predictions/stage1_lr_seresnextaa101d_32x8d/ && \
-CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/stage1_lr/subj05/seresnextaa101d_32x8d_l,r --output_dir predictions/stage1_lr_seresnextaa101d_32x8d/ && \
-CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/stage1_lr/subj06/seresnextaa101d_32x8d_l,r --output_dir predictions/stage1_lr_seresnextaa101d_32x8d/ && \
-CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/stage1_lr/subj07/seresnextaa101d_32x8d_l,r --output_dir predictions/stage1_lr_seresnextaa101d_32x8d/ && \
-CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/stage1_lr/subj08/seresnextaa101d_32x8d_l,r --output_dir predictions/stage1_lr_seresnextaa101d_32x8d/
+CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj01/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj02/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj03/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj04/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj05/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj06/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj07/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj08/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/
+
+
+CUDA_VISIBLE_DEVICES=0 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj01/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=1 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj02/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=2 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj03/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=3 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj04/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=4 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj05/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=5 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj06/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=6 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj07/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/ && \
+CUDA_VISIBLE_DEVICES=7 python scripts/test.py --folds 0,1,2,3,4 --checkpoint_dir logs/text/subj08/seresnextaa101d_32x8d/ --output_dir predictions/roberta_seresnextaa101d_32x8d/
 """
 
 

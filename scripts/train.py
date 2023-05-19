@@ -37,7 +37,7 @@ class Criterion(nn.Module):
         self.pcc = PCCLoss()
 
         self.adaptive_loss_dict = {}
-        for side in ['l', 'r']:
+        for side in ["l", "r"]:
             self.adaptive_loss_dict[side] = {}
             roi_names = self.subject_metadata[side].keys()
             for roi_name in roi_names:
@@ -65,7 +65,7 @@ class Criterion(nn.Module):
         l1_loss = self.l1_loss(pred, gt)
         # adaptive_loss = self.adaptive_loss(pred, gt, side, roi_name)
         return pcc_loss + l1_loss
-    
+
     def adaptive_loss(self, pred, gt, side, roi_name):
         loss_fn = self.adaptive_loss_dict[side][roi_name]
         return torch.mean(loss_fn.lossfun((pred - gt)))
@@ -76,6 +76,9 @@ class Criterion(nn.Module):
         for side in self.args.side:
             # GT
             gt_fmri = batch[side]
+            # import pdb
+
+            # pdb.set_trace()
             roi_names = outputs[side].keys()
             for roi_name in roi_names:
                 pred = outputs[side][roi_name]
@@ -141,7 +144,6 @@ class Metric:
                 )
             )
 
-
     def pearson_corr(self, pred, gt, side):
         # Empty correlation array of shape: (LH vertices)
         correlation = np.zeros(pred.shape[1])
@@ -158,7 +160,7 @@ class Metric:
                     r2[0] != 0
                 ):  # zeros indicate to vertices falling outside the ROI of interest
                     roi_names.append(r2[1])
-                    if side == 'l':
+                    if side == "l":
                         roi_idx = np.where(self.lh_challenge_rois[r1] == r2[0])[0]
                     else:
                         roi_idx = np.where(self.rh_challenge_rois[r1] == r2[0])[0]
@@ -173,7 +175,9 @@ class Metric:
 
         median_roi_correlation = np.array(median_roi_correlation)
 
-        median_roi_correlation = median_roi_correlation[~np.isnan(median_roi_correlation)]
+        median_roi_correlation = median_roi_correlation[
+            ~np.isnan(median_roi_correlation)
+        ]
 
         avg = median_roi_correlation.mean()
 
@@ -182,18 +186,46 @@ class Metric:
     def __call__(self, pred_gt_dict):
         avg = 0
         for side in self.args.side:
-            avg += self.pearson_corr(pred_gt_dict[side]['pred'], pred_gt_dict[side]['gt'], side)
+            avg += self.pearson_corr(
+                pred_gt_dict[side]["pred"], pred_gt_dict[side]["gt"], side
+            )
 
         avg = avg / len(self.args.side)
-        return {
-            'corr': avg
-        }
+        return {"corr": avg}
 
 
 def get_model(args, distributed=True):
     from models.timm_model import AlgonautsTimm
 
     model = AlgonautsTimm(args)
+
+    # move networks to gpu
+    model = model.cuda()
+    if args.use_ema:
+        model_ema = timm.utils.ModelEmaV2(model, decay=args.ema_decay)
+    else:
+        model_ema = None
+
+    # synchronize batch norms (if any)
+    if distributed:
+        if utils.has_batchnorms(model):
+            model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
+
+        model = nn.parallel.DistributedDataParallel(
+            model, device_ids=[args.gpu], find_unused_parameters=True
+        )
+    else:
+        model = nn.DataParallel(model)
+
+    # print(model)
+
+    return model, model_ema
+
+
+def get_text_model(args, distributed=False):
+    from models.text_model import RobertaClass
+
+    model = RobertaClass(args)
 
     # move networks to gpu
     model = model.cuda()
@@ -303,6 +335,7 @@ def train_one_fold(args):
 
     # ============ building Clusformer ... ============
     model, model_ema = get_model(args, args.distributed)
+    # model, model_ema = get_text_model(args, args.distributed)
 
     # ============ preparing loss ... ============
     criterion = Criterion(args)
@@ -457,7 +490,7 @@ def train_one_fold(args):
         if is_save_best:
             utils.save_on_master(save_dict, os.path.join(args.output_dir, "best.pth"))
 
-        utils.save_on_master(save_dict, os.path.join(args.output_dir, "last.pth"))
+        # utils.save_on_master(save_dict, os.path.join(args.output_dir, "last.pth"))
 
         log_train_stats = {
             **{f"train_{k}": v for k, v in train_stats.items()},
@@ -511,7 +544,7 @@ def post_process_output_side(outputs, subject_metadata, side):
     pred_side = None
     counter = None
 
-    num_output = args.num_lh_output if side == 'l' else args.num_rh_output
+    num_output = args.num_lh_output if side == "l" else args.num_rh_output
 
     roi_names = outputs[side].keys()
     for roi_name in roi_names:
@@ -519,7 +552,7 @@ def post_process_output_side(outputs, subject_metadata, side):
         roi_idx = subject_metadata[side][roi_name]
 
         batch_size = pred.shape[0]
-        
+
         if pred_side is None:
             pred_side = np.zeros((batch_size, num_output))
             counter = np.zeros((batch_size, num_output))
@@ -563,8 +596,8 @@ def train_one_epoch(
         pred_gt_dict = {}
         for side in args.side:
             pred_gt_dict[side] = {}
-            pred_gt_dict[side]['pred'] = []
-            pred_gt_dict[side]['gt'] = []
+            pred_gt_dict[side]["pred"] = []
+            pred_gt_dict[side]["gt"] = []
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = "Epoch: [{}/{}]".format(epoch, args.epochs)
 
@@ -585,11 +618,11 @@ def train_one_epoch(
                 loss = loss.mean()
 
             if not is_train:
-            # if True:
+                # if True:
                 processed_pred = post_process_output(outputs, args)
                 for side in args.side:
-                    pred_gt_dict[side]['pred'].append(processed_pred[side])
-                    pred_gt_dict[side]['gt'].append(batch[side].detach().cpu().numpy())
+                    pred_gt_dict[side]["pred"].append(processed_pred[side])
+                    pred_gt_dict[side]["gt"].append(batch[side].detach().cpu().numpy())
 
         if not math.isfinite(loss.item()):
             print("Loss is {}, stopping training".format(loss.item()), force=True)
@@ -625,8 +658,10 @@ def train_one_epoch(
         # gt_lh_fmris.append(gt_lh_fmri)
         # gt_rh_fmris.append(gt_rh_fmri)
         for side in args.side:
-            pred_gt_dict[side]['pred'] = np.concatenate(pred_gt_dict[side]['pred'], axis=0)
-            pred_gt_dict[side]['gt'] = np.concatenate(pred_gt_dict[side]['gt'], axis=0)
+            pred_gt_dict[side]["pred"] = np.concatenate(
+                pred_gt_dict[side]["pred"], axis=0
+            )
+            pred_gt_dict[side]["gt"] = np.concatenate(pred_gt_dict[side]["gt"], axis=0)
         # pred_lh_fmris = np.concatenate(pred_lh_fmris, axis=0)
         # pred_rh_fmris = np.concatenate(pred_rh_fmris, axis=0)
         # gt_lh_fmris = np.concatenate(gt_lh_fmris, axis=0)
