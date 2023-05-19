@@ -8,6 +8,7 @@ def get_args_parser():
 
     # Model, data, etc
     parser.add_argument("--model_name", default="MicroVIT", type=str)
+    parser.add_argument("--text_model", default="distilbert-base-uncased", type=str)
     parser.add_argument("--num_lh_output", default=19004, type=int) # Will be overrided 
     parser.add_argument("--num_rh_output", default=20544, type=int) # Will be overrided
     parser.add_argument("--img_size", default=224, type=int)

@@ -2,7 +2,7 @@ import torch.nn as nn
 import timm
 import os
 import torch
-from transformers import RobertaModel
+from transformers import AutoModel
 
 
 class AlgonautsTimm(nn.Module):
@@ -13,7 +13,7 @@ class AlgonautsTimm(nn.Module):
             model_name=args.model_name, pretrained=True, num_classes=0
         )
 
-        self.text_backbone = RobertaModel.from_pretrained("roberta-base")
+        self.text_backbone = AutoModel.from_pretrained(args.text_model)
         text_num_features = 768
         self.text_fc = nn.Sequential(
             nn.Linear(text_num_features, text_num_features),
@@ -64,12 +64,14 @@ class AlgonautsTimm(nn.Module):
             batch["ids"],
             batch["mask"]        
         )
-        output_1 = self.text_backbone(
+        hidden = self.text_backbone(
             input_ids=input_ids,
             attention_mask=attention_mask,
         )
-        hidden_state = output_1[0]
-        text_features = hidden_state[:, 0]
+
+        text_features = hidden.last_hidden_state[:,0,:]
+        # text_features = torch.stack([hidden_state[-1], hidden_state[-2], hidden_state[-3], hidden_state[-4]])
+        # text_features = torch.mean(text_features, 0)
         text_features = self.text_fc(text_features)
 
         features = torch.cat([features, text_features], axis=-1)

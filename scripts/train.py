@@ -281,6 +281,7 @@ def get_dataloader(args):
         fold=args.fold,
         num_folds=args.num_folds,
         is_train=True,
+        text_model=args.text_model
     )
 
     valid_dataset = AlgonautsDataset(
@@ -290,6 +291,7 @@ def get_dataloader(args):
         fold=args.fold,
         num_folds=args.num_folds,
         is_train=False,
+        text_model=args.text_model
     )
 
     train_sampler = (

@@ -46,11 +46,14 @@ model_name='seresnextaa101d_32x8d'
 # model_name='eva_giant_patch14_224.clip_ft_in1k'
 # model_name='ssl_resnext50_32x4d'
 
+
+text_model='roberta-base'
+
 # Data
-batch_size=16
+batch_size=64
 lr=2.5e-4
 distributed=True
-epochs=12
+epochs=30
 img_size=384
 saveckp_freq=5
 
@@ -82,7 +85,7 @@ echo "Run command ", $command
 
 # output_dir=logs/roi_pcc_l1_384_ema/${subject}/${model_name}/
 side='l,r'
-output_dir=logs/text/${subject}/${model_name}/
+output_dir=logs/text_only/${subject}/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/${subject}
 csv_file=${data_dir}/kfold.csv
@@ -93,6 +96,7 @@ pretrained=logs/multisub/${model_name}/
 PYTHONPATH=. $command \
         scripts/train.py \
         --model_name ${model_name} \
+        --text_model ${text_model} \
         --output_dir ${output_dir} \
         --data_dir ${data_dir} \
         --subject ${SUBJECT} \

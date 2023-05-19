@@ -7,7 +7,7 @@ import glob
 import os
 from pathlib import Path
 import torch
-from transformers import RobertaModel, RobertaTokenizer
+from transformers import AutoTokenizer
 
 
 class AlgonautsDataset(Dataset):
@@ -19,6 +19,7 @@ class AlgonautsDataset(Dataset):
         fold=0,
         num_folds=5,
         is_train=True,
+        text_model=''
     ):
         if not os.path.isfile(csv_file):
             images = []
@@ -91,12 +92,8 @@ class AlgonautsDataset(Dataset):
         self.captions = pd.read_csv("nsd_stim_info_merged_caption.csv")[
             "caption"
         ].values
-        # import pdb
 
-        # pdb.set_trace()
-        self.tokenizer = RobertaTokenizer.from_pretrained(
-            "roberta-base", truncation=True, do_lower_case=True
-        )
+        self.tokenizer = AutoTokenizer.from_pretrained(text_model)
         self.max_len = 64
 
     def load_image(self, img_path):
@@ -131,14 +128,14 @@ class AlgonautsDataset(Dataset):
     def load_caption(self, image_path):
         file_name = image_path.split("/")[-1].split(".")[0]
         nsd_id = int(file_name.split("-")[-1])
-        caption = self.captions[nsd_id]
+        caption = self.captions[nsd_id].split("|")
+        caption = ". ".join(caption)
         return caption
 
     def tokenize_caption(self, caption):
-        inputs = self.tokenizer.encode_plus(
+        inputs = self.tokenizer(
             caption,
             truncation=True,
-            add_special_tokens=True,
             max_length=self.max_len,
             padding='max_length'
         )
@@ -165,13 +162,14 @@ class AlgonautsDataset(Dataset):
         caption_token = self.tokenize_caption(caption)
 
         ret = {"image": img, "l": lh_fmri, "r": rh_fmri}
+        # ret = {"l": lh_fmri, "r": rh_fmri}
         ret.update(caption_token)
 
         return ret
 
 
 class AlgonautsTestDataset(Dataset):
-    def __init__(self, data_dir, transform=None):
+    def __init__(self, data_dir, transform=None, text_model=''):
         test_img_dir = f"{data_dir}/test_split/test_images/"
         self.images = sorted(list(Path(test_img_dir).iterdir()))
         self.transform = transform
@@ -225,9 +223,11 @@ class AlgonautsTestDataset(Dataset):
         self.captions = pd.read_csv("nsd_stim_info_merged_caption.csv")[
             "caption"
         ].values
-        self.tokenizer = RobertaTokenizer.from_pretrained(
-            "roberta-base", truncation=True, do_lower_case=True
-        )
+        self.captions = pd.read_csv("nsd_stim_info_merged_caption.csv")[
+            "caption"
+        ].values
+
+        self.tokenizer = AutoTokenizer.from_pretrained(text_model)
         self.max_len = 64
 
     def load_image(self, img_path):
@@ -261,10 +261,9 @@ class AlgonautsTestDataset(Dataset):
         return caption
 
     def tokenize_caption(self, caption):
-        inputs = self.tokenizer.encode_plus(
+        inputs = self.tokenizer(
             caption,
             truncation=True,
-            add_special_tokens=True,
             max_length=self.max_len,
             padding='max_length'
         )

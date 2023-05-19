@@ -88,6 +88,7 @@ def get_dataloader(args):
     valid_dataset = AlgonautsTestDataset(
         data_dir=args.data_dir,
         transform=train_transform,
+        text_model=args.text_model
     )
 
     valid_loader = torch.utils.data.DataLoader(

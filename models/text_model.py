@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
-from transformers import RobertaModel
+from transformers import AutoModel
 
 
 class RobertaClass(torch.nn.Module):
     def __init__(self, args):
         super(RobertaClass, self).__init__()
-        self.l1 = RobertaModel.from_pretrained("roberta-base")
+        self.l1 = AutoModel.from_pretrained(args.text_model)
         in_features = 768
         subject_metadata = args.subject_metadata
 
@@ -23,18 +23,16 @@ class RobertaClass(torch.nn.Module):
             self.fc[side] = fc
 
     def forward(self, batch):
-        input_ids, attention_mask, token_type_ids = (
+        input_ids, attention_mask = (
             batch["ids"],
-            batch["mask"],
-            batch["token_type_ids"],
+            batch["mask"]
         )
-        output_1 = self.l1(
+        hidden = self.l1(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
         )
-        hidden_state = output_1[0]
-        features = hidden_state[:, 0]
+        features = hidden.last_hidden_state[:,0,:]
+        # features = hidden_state[:, 0]
 
         output_dict = {}
         for side in self.side:
