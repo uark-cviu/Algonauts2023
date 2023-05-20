@@ -37,7 +37,7 @@ class Criterion(nn.Module):
         self.pcc = PCCLoss()
 
         self.adaptive_loss_dict = {}
-        for side in ['l', 'r']:
+        for side in ["l", "r"]:
             self.adaptive_loss_dict[side] = {}
             roi_names = self.subject_metadata[side].keys()
             for roi_name in roi_names:
@@ -65,7 +65,7 @@ class Criterion(nn.Module):
         l1_loss = self.l1_loss(pred, gt)
         # adaptive_loss = self.adaptive_loss(pred, gt, side, roi_name)
         return pcc_loss + l1_loss
-    
+
     def adaptive_loss(self, pred, gt, side, roi_name):
         loss_fn = self.adaptive_loss_dict[side][roi_name]
         return torch.mean(loss_fn.lossfun((pred - gt)))
@@ -142,7 +142,6 @@ class Metric:
             )
 
     def __call__(self, pred_lh_fmri, pred_rh_fmri, gt_lh_fmri, gt_rh_fmri):
-
         # Empty correlation array of shape: (LH vertices)
         lh_correlation = np.zeros(pred_lh_fmri.shape[1])
         # Correlate each predicted LH vertex with the corresponding ground truth vertex
@@ -184,8 +183,12 @@ class Metric:
         lh_median_roi_correlation = np.array(lh_median_roi_correlation)
         rh_median_roi_correlation = np.array(rh_median_roi_correlation)
 
-        lh_median_roi_correlation = lh_median_roi_correlation[~np.isnan(lh_median_roi_correlation)]
-        rh_median_roi_correlation = rh_median_roi_correlation[~np.isnan(rh_median_roi_correlation)]
+        lh_median_roi_correlation = lh_median_roi_correlation[
+            ~np.isnan(lh_median_roi_correlation)
+        ]
+        rh_median_roi_correlation = rh_median_roi_correlation[
+            ~np.isnan(rh_median_roi_correlation)
+        ]
 
         avg = (lh_median_roi_correlation.mean() + rh_median_roi_correlation.mean()) / 2
 
@@ -459,7 +462,7 @@ def train_one_fold(args):
         if is_save_best:
             utils.save_on_master(save_dict, os.path.join(args.output_dir, "best.pth"))
 
-        utils.save_on_master(save_dict, os.path.join(args.output_dir, "last.pth"))
+        # utils.save_on_master(save_dict, os.path.join(args.output_dir, "last.pth"))
 
         log_train_stats = {
             **{f"train_{k}": v for k, v in train_stats.items()},
@@ -474,8 +477,8 @@ def train_one_fold(args):
                 f.write(json.dumps(log_train_stats) + "\n")
                 f.write(json.dumps(log_valid_stats) + "\n")
 
-        # if best_score == 100:  # (args.subject != 0 and patient_counter == 15):
-        #     break
+        if patient_counter == 3:
+            break
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
@@ -504,7 +507,7 @@ def train(args):
         print("training fold ", fold)
         args.fold = fold
         args.output_dir = f"{output_dir}/{fold}/"
-        args.pretrained = f"{pretrained}/{fold}/last.pth"
+        args.pretrained = f"{pretrained}/{fold}/best.pth"
         os.makedirs(args.output_dir, exist_ok=True)
         train_one_fold(args)
 
@@ -520,8 +523,8 @@ def post_process_output(outputs, args):
             roi_idx = subject_metadata[side][roi_name]
 
             batch_size = pred.shape[0]
-            
-            if side == 'l':
+
+            if side == "l":
                 if pred_l is None:
                     pred_l = np.zeros((batch_size, args.num_lh_output))
                     counter_l = np.zeros((batch_size, args.num_lh_output))
@@ -589,7 +592,7 @@ def train_one_epoch(
                 loss = loss.mean()
 
             if not is_train:
-            # if True:
+                # if True:
                 pred_lh_fmri, pred_rh_fmri = post_process_output(outputs, args)
                 gt_lh_fmri = batch["l"].detach().cpu().numpy()
                 gt_rh_fmri = batch["r"].detach().cpu().numpy()
