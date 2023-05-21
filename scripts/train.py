@@ -42,10 +42,12 @@ class Criterion(nn.Module):
             roi_names = self.subject_metadata[side].keys()
             for roi_name in roi_names:
                 num_output = self.subject_metadata[side][roi_name].sum()
-                # loss_fn = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
-                #     num_dims = num_output, float_dtype=np.float32, device='cuda:0'
-                # )
-                loss_fn = self.l1_loss
+                loss_fn = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
+                    num_dims=num_output,
+                    float_dtype=np.float32,
+                    device=f"cuda:{args.gpu}",
+                )
+                # loss_fn = self.l1_loss
                 self.adaptive_loss_dict[side][roi_name] = loss_fn
 
         # self.adaptive_lh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
