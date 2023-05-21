@@ -258,6 +258,23 @@ def get_dataloader(args):
         is_train=True,
     )
 
+    args.num_lh_output = train_dataset.num_lh_output
+    args.num_rh_output = train_dataset.num_rh_output
+
+    args.min_max_lh = train_dataset.min_max_lh
+    args.min_max_rh = train_dataset.min_max_rh
+
+    if args.pseudo_dir != "":
+        from datasets.algonauts_2023 import AlgonautsPseudoDataset
+
+        pseudo_dataset = AlgonautsPseudoDataset(
+            data_dir=args.data_dir,
+            transform=train_transform,
+            pseudo_dir=args.pseudo_dir,
+        )
+
+        train_dataset = torch.utils.data.ConcatDataset([train_dataset, pseudo_dataset])
+
     valid_dataset = AlgonautsDataset(
         data_dir=args.data_dir,
         csv_file=args.csv_file,
@@ -294,12 +311,6 @@ def get_dataloader(args):
         pin_memory=True,
         sampler=valid_sampler,
     )
-
-    args.num_lh_output = train_dataset.num_lh_output
-    args.num_rh_output = train_dataset.num_rh_output
-
-    args.min_max_lh = train_dataset.min_max_lh
-    args.min_max_rh = train_dataset.min_max_rh
 
     return train_loader, valid_loader
 

@@ -3,13 +3,13 @@ import os
 
 
 subs = [
-    "predictions_vision/convnext_xlarge_448",
-    "predictions_vision/seresnext101d_32x8d_448",
+    "predictions_vision/convnext_xlarge_pseudo",
+    "predictions_vision/seresnext101d_32x8d_pseudo",
 ]
 
 weights = [0.65, 0.35]
 
-save_dir = "predictions_vision/ensemble_convnext_xlarge_seresnext101d_32x8d_448"
+save_dir = "predictions_vision/ensemble_convnext_xlarge_seresnext101d_32x8d_pseudo"
 
 
 for sub_id in range(1, 9):
