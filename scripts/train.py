@@ -264,7 +264,8 @@ def get_dataloader(args):
     args.min_max_lh = train_dataset.min_max_lh
     args.min_max_rh = train_dataset.min_max_rh
 
-    if args.pseudo_dir != "":
+    if args.pseudo_dir != "none":
+        print("[+] Pseudo Training")
         from datasets.algonauts_2023 import AlgonautsPseudoDataset
 
         pseudo_dataset = AlgonautsPseudoDataset(
@@ -490,8 +491,8 @@ def train_one_fold(args):
                 f.write(json.dumps(log_train_stats) + "\n")
                 f.write(json.dumps(log_valid_stats) + "\n")
 
-        if patient_counter == 3:
-            break
+        # if patient_counter == 3:
+        #     break
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

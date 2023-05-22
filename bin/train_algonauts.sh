@@ -55,6 +55,7 @@ distributed=True
 epochs=12
 img_size=384
 saveckp_freq=5
+scheduler='onecycle'
 
 JOB_NAME=${model_name}-${subject}
 
@@ -82,14 +83,15 @@ fi
 
 echo "Run command ", $command
 
-output_dir=logs/finetune_pseudo/${subject}/${model_name}/
+output_dir=logs/finetune_onecycle/${subject}/${model_name}/
 # output_dir=/scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/${subject}/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/${subject}
 csv_file=${data_dir}/kfold.csv
 
 pretrained=logs/multisub/${model_name}/
-pseudo_dir=predictions_vision/ensemble_convnext_xlarge_seresnext101d_32x8d/
+# pseudo_dir=predictions_vision/ensemble_convnext_xlarge_seresnext101d_32x8d/
+pseudo_dir='none'
 
 PYTHONPATH=. $command \
         scripts/train.py \
@@ -106,6 +108,7 @@ PYTHONPATH=. $command \
         --epochs ${epochs} \
         --distributed ${distributed} \
         --saveckp_freq ${saveckp_freq} \
+        --scheduler ${scheduler} \
         --num_workers 4 \
         --use_fp16 False \
         --use_ema True
