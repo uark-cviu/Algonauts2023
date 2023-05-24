@@ -36,10 +36,10 @@ export MASTER_PORT=$MASTER_PORT
 export OFFSET=${OFFSET}
 
 # Data
-batch_size=8
-lr=2.5e-3
+batch_size=2048
+lr=2.5e-4
 distributed=True
-epochs=30
+epochs=5
 saveckp_freq=5
 scheduler='cosine'
 

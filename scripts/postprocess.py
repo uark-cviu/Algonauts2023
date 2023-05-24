@@ -209,51 +209,75 @@ class PostProcessModel(nn.Module):
     def __init__(self, args) -> None:
         super().__init__()
 
-        subject_metadata = args.subject_metadata
-        num_models = len(args.model_names)
+        self.subject_metadata = args.subject_metadata
+        self.num_models = len(args.model_names)
+        # self.weight_l = nn.ModuleList([torch.Tensor([1/self.num_models], dtype=torch.float32, requires_grad=True) for _ in range(self.num_models)])
+        # self.weight_r = nn.ModuleList([torch.Tensor([1/self.num_models], dtype=torch.float32, requires_grad=True) for _ in range(self.num_models)])
 
-        # self.weights = nn.ModuleList([torch.Tensor([1/num_models], dtype=torch.float32, requires_grad=True) for _ in range(num_models)])
-        in_channels = 2
-        num_models = len(args.model_names)
-        inter_features = 1024
+        # self.weight_l = nn.Parameter(torch.Tensor([1/self.num_models for _ in range(self.num_models)]).float(), requires_grad=True)
+        # self.weight_r = nn.Parameter(torch.Tensor([1/self.num_models for _ in range(self.num_models)]).float(), requires_grad=True)
 
-        kernel_size = 3
+        # self.weight_l.requires_grad = True
+        # self.weight_r.requires_grad = True
+        # in_channels = 2
+        # num_models = len(args.model_names)
+        # inter_features = 1024
 
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels=in_channels, out_channels=inter_features, kernel_size=(kernel_size,num_models)),
-            nn.BatchNorm2d(inter_features),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=inter_features, out_channels=inter_features, kernel_size=(kernel_size, 1)),
-            nn.BatchNorm2d(inter_features),
-            nn.ReLU(),
-            nn.AdaptiveAvgPool2d(1),
-            nn.Flatten(),
-        )
+        # kernel_size = 3
+
+        # self.conv = nn.Sequential(
+        #     nn.Conv2d(in_channels=in_channels, out_channels=inter_features, kernel_size=(kernel_size,num_models)),
+        #     nn.BatchNorm2d(inter_features),
+        #     nn.ReLU(),
+        #     nn.Conv2d(in_channels=inter_features, out_channels=inter_features, kernel_size=(kernel_size, 1)),
+        #     nn.BatchNorm2d(inter_features),
+        #     nn.ReLU(),
+        #     nn.AdaptiveAvgPool2d(1),
+        #     nn.Flatten(),
+        # )
 
         self.side = ["l", "r"]
-        self.fc = nn.ModuleDict()
+        # self.fc = nn.ModuleDict()
+
+        weight = nn.Parameter(torch.Tensor([1/self.num_models for _ in range(self.num_models)]).float(), requires_grad=True)
 
         for side in self.side:
-            fc = nn.ModuleDict()
-            for roi_name, roi_index in subject_metadata[side].items():
+            for roi_name, roi_index in self.subject_metadata[side].items():
                 roi_size = sum(roi_index)
                 if roi_size > 0:
-                    fc[roi_name] = nn.Linear(inter_features, roi_size)
-            self.fc[side] = fc
+                    self.__setattr__(f"{side}_{roi_name}", weight)
 
     def forward(self, batch):
-        image = batch["image"] # N x (n_models) x seq x 2
-        features = self.conv(image)
+        data_l = batch["data_l"] # N x (n_models) x seq
+        data_r = batch["data_r"] # N x (n_models) x seq
 
         output_dict = {}
+
         for side in self.side:
+            if side == 'r':
+                data = data_r
+            else:
+                data = data_l
+
             output_dict[side] = {}
-            for roi_name, roi_fc in self.fc[side].items():
-                output = roi_fc(features)
-                output_dict[side][roi_name] = output
+
+            for roi_name, roi_index in self.subject_metadata[side].items():
+                roi_size = sum(roi_index)
+                if roi_size > 0:
+                    roi_signal = data[:, :, np.where(roi_index)[0]]
+                    weight = self.__getattr__(f"{side}_{roi_name}") 
+
+                    total = 0
+                    weight_sum = 0
+                    for i in range(self.num_models):
+                        total += roi_signal[:, i] * weight[i]
+
+                        weight_sum += weight[i]
+                    total /= weight_sum
+                    # import pdb; pdb.set_trace()
+                    output_dict[side][roi_name] = total
 
         return output_dict
-
 
 from torch.utils.data import Dataset
 
@@ -262,7 +286,7 @@ class EnsembleDataset(Dataset):
     def __init__(
         self, oof_dir, subject="subj01", models=[], fold=0, num_folds=5, is_train=False
     ):
-        self.data = []
+        self.data_l, self.data_r = [], []
         self.lh_fmris = []
         self.rh_fmris = []
 
@@ -270,21 +294,26 @@ class EnsembleDataset(Dataset):
             [fold] if not is_train else [i for i in range(num_folds) if i != fold]
         )
         for i in loaded_folds:
-            data_models = []
+            data_l, data_r = [], []
             for model_name in models:
                 oof_file = f"{oof_dir}/{model_name}/{subject}/fold_{i}.pkl"
-                valid_data, lh_fmri, rh_fmri = self.load_valid_data(oof_file)
-                data_models.append(valid_data)
+                l, r, lh_fmri, rh_fmri = self.load_valid_data(oof_file)
+                data_l.append(l)
+                data_r.append(r)
             self.lh_fmris.append(lh_fmri)
             self.rh_fmris.append(rh_fmri)
-            data_models = np.concatenate(
-                data_models, axis=-1
-            )  # N x 2 x seq x num_models
+            data_l = np.concatenate(
+                data_l, axis=1
+            ) # N x num_models x seq
+            data_r = np.concatenate(
+                data_r, axis=1
+            ) # N x num_models x seq
 
-            self.data.append(data_models)
+            self.data_l.append(data_l)
+            self.data_r.append(data_r)
 
-        self.data = np.concatenate(self.data, axis=0)
-        self.data = (self.data - np.mean(self.data)) / np.std(self.data)
+        self.data_l = np.concatenate(self.data_l, axis=0)
+        self.data_r = np.concatenate(self.data_r, axis=0)
         self.lh_fmris = np.concatenate(self.lh_fmris, axis=0)  # N x seq_lh
         self.rh_fmris = np.concatenate(self.rh_fmris, axis=0)  # N x seq_rh
 
@@ -306,25 +335,28 @@ class EnsembleDataset(Dataset):
         with open(pickle_file, "rb") as f:
             data_dict = pickle.load(f)
 
-        l, r = data_dict["valid"]["l"], data_dict["valid"]["r"]
-        l, r = self.pad_if_need(l, r)  # N x seq
-        l = np.expand_dims(l, axis=1)  # N x 1 x seq
-        r = np.expand_dims(r, axis=1)  # N x 1 x seq
-        data = np.concatenate([l, r], axis=1)  # N x 2 x seq
-        data = np.expand_dims(data, axis=-1)  # N x 2 x seq x 1
+        l, r = data_dict["valid"]["l"], data_dict["valid"]["r"] # N x seq
+        l = np.expand_dims(l, axis=1)
+        r = np.expand_dims(r, axis=1)
+        # l, r = self.pad_if_need(l, r)  # N x seq
+        # l = np.expand_dims(l, axis=1)  # N x 1 x seq
+        # r = np.expand_dims(r, axis=1)  # N x 1 x seq
+        # data = np.concatenate([l, r], axis=1)  # N x 2 x seq
+        # data = np.expand_dims(data, axis=-1)  # N x 2 x seq x 1
         gt_l, gt_r = data_dict["valid_gt"]["l"], data_dict["valid_gt"]["r"]
-        return data, gt_l, gt_r
+        return l, r, gt_l, gt_r
 
     def __len__(self):
-        return len(self.data)
+        return len(self.data_l)
 
     def __getitem__(self, index):
-        data = self.data[index].astype(np.float32)
+        data_l = self.data_l[index].astype(np.float32)
+        data_r = self.data_r[index].astype(np.float32)
         # data = np.transpose(data, (, 1, 2))
         lh_fmri = self.lh_fmris[index].astype(np.float32)
         rh_fmri = self.rh_fmris[index].astype(np.float32)
 
-        return {"image": data, "l": lh_fmri, "r": rh_fmri}
+        return {"data_l": data_l, "data_r": data_r, "l": lh_fmri, "r": rh_fmri}
 
 
 def get_model(args, distributed=True):
