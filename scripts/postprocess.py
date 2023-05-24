@@ -20,7 +20,7 @@ import torch.nn as nn
 from schedulers import OneCycleLRWithWarmup
 from utils import dino as utils
 from utils.algonauts_parser import get_args_parser
-from datasets.algonauts_2023 import AlgonautsDataset
+from datasets.postprocess import EnsembleDataset
 from scipy.stats import pearsonr as corr
 from criterions.pcc import PCCLoss
 import robust_loss_pytorch
@@ -205,161 +205,9 @@ class Metric:
         return {"corr": avg}
 
 
-class PostProcessModel(nn.Module):
-    def __init__(self, args) -> None:
-        super().__init__()
-
-        self.subject_metadata = args.subject_metadata
-        self.num_models = len(args.model_names)
-        # self.weight_l = nn.ModuleList([torch.Tensor([1/self.num_models], dtype=torch.float32, requires_grad=True) for _ in range(self.num_models)])
-        # self.weight_r = nn.ModuleList([torch.Tensor([1/self.num_models], dtype=torch.float32, requires_grad=True) for _ in range(self.num_models)])
-
-        # self.weight_l = nn.Parameter(torch.Tensor([1/self.num_models for _ in range(self.num_models)]).float(), requires_grad=True)
-        # self.weight_r = nn.Parameter(torch.Tensor([1/self.num_models for _ in range(self.num_models)]).float(), requires_grad=True)
-
-        # self.weight_l.requires_grad = True
-        # self.weight_r.requires_grad = True
-        # in_channels = 2
-        # num_models = len(args.model_names)
-        # inter_features = 1024
-
-        # kernel_size = 3
-
-        # self.conv = nn.Sequential(
-        #     nn.Conv2d(in_channels=in_channels, out_channels=inter_features, kernel_size=(kernel_size,num_models)),
-        #     nn.BatchNorm2d(inter_features),
-        #     nn.ReLU(),
-        #     nn.Conv2d(in_channels=inter_features, out_channels=inter_features, kernel_size=(kernel_size, 1)),
-        #     nn.BatchNorm2d(inter_features),
-        #     nn.ReLU(),
-        #     nn.AdaptiveAvgPool2d(1),
-        #     nn.Flatten(),
-        # )
-
-        self.side = ["l", "r"]
-        # self.fc = nn.ModuleDict()
-
-        weight = nn.Parameter(torch.Tensor([1/self.num_models for _ in range(self.num_models)]).float(), requires_grad=True)
-
-        for side in self.side:
-            for roi_name, roi_index in self.subject_metadata[side].items():
-                roi_size = sum(roi_index)
-                if roi_size > 0:
-                    self.__setattr__(f"{side}_{roi_name}", weight)
-
-    def forward(self, batch):
-        data_l = batch["data_l"] # N x (n_models) x seq
-        data_r = batch["data_r"] # N x (n_models) x seq
-
-        output_dict = {}
-
-        for side in self.side:
-            if side == 'r':
-                data = data_r
-            else:
-                data = data_l
-
-            output_dict[side] = {}
-
-            for roi_name, roi_index in self.subject_metadata[side].items():
-                roi_size = sum(roi_index)
-                if roi_size > 0:
-                    roi_signal = data[:, :, np.where(roi_index)[0]]
-                    weight = self.__getattr__(f"{side}_{roi_name}") 
-
-                    total = 0
-                    weight_sum = 0
-                    for i in range(self.num_models):
-                        total += roi_signal[:, i] * weight[i]
-
-                        weight_sum += weight[i]
-                    total /= weight_sum
-                    # import pdb; pdb.set_trace()
-                    output_dict[side][roi_name] = total
-
-        return output_dict
-
-from torch.utils.data import Dataset
-
-
-class EnsembleDataset(Dataset):
-    def __init__(
-        self, oof_dir, subject="subj01", models=[], fold=0, num_folds=5, is_train=False
-    ):
-        self.data_l, self.data_r = [], []
-        self.lh_fmris = []
-        self.rh_fmris = []
-
-        loaded_folds = (
-            [fold] if not is_train else [i for i in range(num_folds) if i != fold]
-        )
-        for i in loaded_folds:
-            data_l, data_r = [], []
-            for model_name in models:
-                oof_file = f"{oof_dir}/{model_name}/{subject}/fold_{i}.pkl"
-                l, r, lh_fmri, rh_fmri = self.load_valid_data(oof_file)
-                data_l.append(l)
-                data_r.append(r)
-            self.lh_fmris.append(lh_fmri)
-            self.rh_fmris.append(rh_fmri)
-            data_l = np.concatenate(
-                data_l, axis=1
-            ) # N x num_models x seq
-            data_r = np.concatenate(
-                data_r, axis=1
-            ) # N x num_models x seq
-
-            self.data_l.append(data_l)
-            self.data_r.append(data_r)
-
-        self.data_l = np.concatenate(self.data_l, axis=0)
-        self.data_r = np.concatenate(self.data_r, axis=0)
-        self.lh_fmris = np.concatenate(self.lh_fmris, axis=0)  # N x seq_lh
-        self.rh_fmris = np.concatenate(self.rh_fmris, axis=0)  # N x seq_rh
-
-        self.num_lh_output = self.lh_fmris.shape[1]
-        self.num_rh_output = self.rh_fmris.shape[1]
-
-    def pad_if_need(self, l, r):
-        max_len = max(l.shape[1], r.shape[1])
-        N = l.shape[0]
-        new_l = np.zeros((N, max_len))
-        new_r = np.zeros((N, max_len))
-
-        new_l[:, : l.shape[1]] = l
-        new_r[:, : r.shape[1]] = r
-
-        return new_l, new_r
-
-    def load_valid_data(self, pickle_file):
-        with open(pickle_file, "rb") as f:
-            data_dict = pickle.load(f)
-
-        l, r = data_dict["valid"]["l"], data_dict["valid"]["r"] # N x seq
-        l = np.expand_dims(l, axis=1)
-        r = np.expand_dims(r, axis=1)
-        # l, r = self.pad_if_need(l, r)  # N x seq
-        # l = np.expand_dims(l, axis=1)  # N x 1 x seq
-        # r = np.expand_dims(r, axis=1)  # N x 1 x seq
-        # data = np.concatenate([l, r], axis=1)  # N x 2 x seq
-        # data = np.expand_dims(data, axis=-1)  # N x 2 x seq x 1
-        gt_l, gt_r = data_dict["valid_gt"]["l"], data_dict["valid_gt"]["r"]
-        return l, r, gt_l, gt_r
-
-    def __len__(self):
-        return len(self.data_l)
-
-    def __getitem__(self, index):
-        data_l = self.data_l[index].astype(np.float32)
-        data_r = self.data_r[index].astype(np.float32)
-        # data = np.transpose(data, (, 1, 2))
-        lh_fmri = self.lh_fmris[index].astype(np.float32)
-        rh_fmri = self.rh_fmris[index].astype(np.float32)
-
-        return {"data_l": data_l, "data_r": data_r, "l": lh_fmri, "r": rh_fmri}
-
-
 def get_model(args, distributed=True):
+    from models.postprocess import PostProcessModel
+
     model = PostProcessModel(args)
 
     # move networks to gpu
@@ -622,6 +470,9 @@ def train_one_fold(args):
 def train(args):
     # args.distributed = True
 
+    with open("subject_meta.pkl", "rb") as f:
+        subject_metadata = pickle.load(f)
+
     if "WORLD_SIZE" in os.environ:
         args.world_size = int(os.environ["WORLD_SIZE"])
 
@@ -635,15 +486,33 @@ def train(args):
     cudnn.benchmark = True
 
     output_dir = args.output_dir
+    data_dir = args.data_dir
     pretrained = args.pretrained
 
-    for fold in [0, 1, 2, 3, 4]:
-        print("training fold ", fold)
-        args.fold = fold
-        args.output_dir = f"{output_dir}/{fold}/"
-        args.pretrained = f"{pretrained}/{fold}/best.pth"
-        os.makedirs(args.output_dir, exist_ok=True)
-        train_one_fold(args)
+    args.subject_metadata = subject_metadata[args.subject]
+
+    for subject_id in [
+        "subj01",
+        "subj02",
+        "subj03",
+        "subj04",
+        "subj05",
+        "subj06",
+        "subj07",
+        "subj08",
+    ]:
+        args.subject = subject_id
+        args.subject_metadata = subject_metadata[args.subject]
+        # args.output_dir = f"{output_dir}/{subject_id}"
+        args.data_dir = f"{data_dir}/{subject_id}"
+        args.csv_file = f"{args.data_dir}/kfold.csv"
+        for fold in [0, 1, 2, 3, 4]:
+            print(f"training {subject_id} fold {fold}")
+            args.fold = fold
+            args.output_dir = f"{output_dir}/{subject_id}/{fold}/"
+            args.pretrained = f"{pretrained}/{fold}/best.pth"
+            os.makedirs(args.output_dir, exist_ok=True)
+            train_one_fold(args)
 
 
 def post_process_output(outputs, args):
@@ -790,8 +659,5 @@ if __name__ == "__main__":
     ]
     args.model_names = model_names
     args.oof_dir = "oof"
-    with open("subject_meta.pkl", "rb") as f:
-        subject_metadata = pickle.load(f)
-        args.subject_metadata = subject_metadata[args.subject]
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     train(args)

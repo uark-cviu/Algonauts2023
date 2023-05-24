@@ -69,7 +69,7 @@ fi
 
 echo "Run command ", $command
 
-output_dir=logs/postprocessing/
+output_dir=logs/postprocessing_rnd/
 data_dir=data/
 csv_file=${data_dir}/kfold.csv
 

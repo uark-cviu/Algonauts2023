@@ -13,7 +13,7 @@ class PostProcessModel(nn.Module):
         self.side = ["l", "r"]
         # self.fc = nn.ModuleDict()
 
-        weight = nn.Parameter(torch.Tensor([1/self.num_models for _ in range(self.num_models)]).float(), requires_grad=True)
+        weight = nn.Parameter(torch.rand(self.num_models), requires_grad=True)
 
         for side in self.side:
             for roi_name, roi_index in self.subject_metadata[side].items():
