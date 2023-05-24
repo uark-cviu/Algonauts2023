@@ -69,8 +69,8 @@ fi
 
 echo "Run command ", $command
 
-output_dir=logs/postprocessing/${subject}/
-data_dir=data/${subject}
+output_dir=logs/postprocessing/
+data_dir=data/
 csv_file=${data_dir}/kfold.csv
 
 PYTHONPATH=. $command \
