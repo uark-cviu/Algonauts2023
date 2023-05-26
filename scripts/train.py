@@ -491,8 +491,8 @@ def train_one_fold(args):
                 f.write(json.dumps(log_train_stats) + "\n")
                 f.write(json.dumps(log_valid_stats) + "\n")
 
-        # if patient_counter == 3:
-        #     break
+        if patient_counter == 3:
+            break
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
