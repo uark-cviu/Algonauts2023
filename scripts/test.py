@@ -142,6 +142,9 @@ def train(args):
     pred_rh_final = 0
     pred_lh_final = 0
 
+    pred_rh_folds = []
+    pred_lh_folds = []
+
     for fold in folds:
         checkpoint = f"{args.checkpoint_dir}/{fold}/best.pth"
         checkpoint = torch.load(checkpoint)
@@ -156,7 +159,7 @@ def train(args):
 
         # ============ building Clusformer ... ============
         model = get_model(train_args)
-        model.load_state_dict(checkpoint['model'])
+        model.load_state_dict(checkpoint["model"])
         # model.load_state_dict(checkpoint["ema"])
         model.eval()
 
@@ -182,8 +185,14 @@ def train(args):
         pred_rh_fmris = np.concatenate(pred_rh_fmris)
         pred_lh_fmris = np.concatenate(pred_lh_fmris)
 
+        pred_rh_folds.append(pred_rh_fmris)
+        pred_lh_folds.append(pred_lh_fmris)
+
         pred_rh_final += pred_rh_fmris / len(folds)
         pred_lh_final += pred_lh_fmris / len(folds)
+
+    pred_rh_folds = np.array(pred_rh_folds)
+    pred_lh_folds = np.array(pred_lh_folds)
 
     pred_lh_final = pred_lh_final.astype(np.float32)
     pred_rh_final = pred_rh_final.astype(np.float32)
@@ -195,6 +204,9 @@ def train(args):
     os.makedirs(output_dir, exist_ok=True)
     np.save(f"{output_dir}/lh_pred_test.npy", pred_lh_final)
     np.save(f"{output_dir}/rh_pred_test.npy", pred_rh_final)
+
+    np.save(f"{output_dir}/lh_pred_fold.npy", pred_lh_folds)
+    np.save(f"{output_dir}/rh_pred_fold.npy", pred_rh_folds)
 
 
 if __name__ == "__main__":
