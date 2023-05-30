@@ -21,6 +21,7 @@ from schedulers import OneCycleLRWithWarmup
 from utils import dino as utils
 from utils.algonauts_parser import get_args_parser
 from datasets.algonauts_2023 import AlgonautsDataset
+from datasets.algonauts_coco import AlgonautsCOCODataset
 from scipy.stats import pearsonr as corr
 from criterions.pcc import PCCLoss
 import robust_loss_pytorch
