@@ -39,6 +39,7 @@ export OFFSET=${OFFSET}
 # model_name='vit_small_patch16_224'
 # model_name='convnext_base_in22ft1k'
 model_name='seresnext101d_32x8d'
+# model_name='convnext_xlarge.fb_in22k_ft_in1k_384'
 # model_name='maxvit_large_tf_384.in21k_ft_in1k'
 # model_name='tf_efficientnet_b7.ns_jft_in1k'
 # model_name='resnetrs420'
@@ -53,6 +54,7 @@ distributed=True
 epochs=15
 img_size=384
 saveckp_freq=5
+dataset='AlgonautsDataset'
 
 
 # export CUDA_VISIBLE_DEVICES=0
@@ -85,14 +87,16 @@ echo "Run command ", $command
 # CUDA_VISIBLE_DEVICES=4 FOLDS=4 NGPUS=1 RUN_MODE=dist_new bash bin/train_algonauts.sh 2>&1 | tee fold_4.txt &
 
 # output_dir=logs/baseline_pcc_l1/${subject}/${model_name}/
-output_dir=/scr1/1594489/logs/multisub/${model_name}/
+output_dir=logs/multisub_coco_ft/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/
 csv_file=${data_dir}/kfold.csv
+pretrained=logs/multisub_coco/${model_name}/
 
 PYTHONPATH=. $command \
         scripts/train.py \
         --model_name ${model_name} \
+        --dataset ${dataset} \
         --output_dir ${output_dir} \
         --data_dir ${data_dir} \
         --csv_file ${csv_file} \
@@ -105,4 +109,5 @@ PYTHONPATH=. $command \
         --num_workers 4 \
         --use_fp16 False \
         --folds ${FOLDS} \
+        --pretrained ${pretrained} \
         --use_ema True

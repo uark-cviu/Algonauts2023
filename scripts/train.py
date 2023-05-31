@@ -21,6 +21,7 @@ from schedulers import OneCycleLRWithWarmup
 from utils import dino as utils
 from utils.algonauts_parser import get_args_parser
 from datasets.algonauts_2023 import AlgonautsDataset
+from datasets.algonauts_coco import AlgonautsCOCODataset
 from scipy.stats import pearsonr as corr
 from criterions.pcc import PCCLoss
 import robust_loss_pytorch
@@ -34,24 +35,30 @@ class Criterion(nn.Module):
         self.mse_loss = nn.MSELoss()
         self.pcc = PCCLoss()
         self.adaptive_lh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
-            num_dims = args.num_lh_output, float_dtype=np.float32, device=f'cuda:{args.gpu}'
+            num_dims=args.num_lh_output,
+            float_dtype=np.float32,
+            device=f"cuda:{args.gpu}",
         )
 
         self.adaptive_rh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
-            num_dims = args.num_rh_output, float_dtype=np.float32, device=f'cuda:{args.gpu}'
+            num_dims=args.num_rh_output,
+            float_dtype=np.float32,
+            device=f"cuda:{args.gpu}",
         )
 
     def forward(self, outputs, batch):
-        pred_lh_fmri = outputs['lh_fmri']
-        pred_rh_fmri = outputs['rh_fmri']
-        gt_lh_fmri = batch['lh_fmri']
-        gt_rh_fmri = batch['rh_fmri']
+        pred_lh_fmri = outputs["lh_fmri"]
+        pred_rh_fmri = outputs["rh_fmri"]
+        gt_lh_fmri = batch["lh_fmri"]
+        gt_rh_fmri = batch["rh_fmri"]
 
         # l1_loss = self.l1_loss(pred_lh_fmri, gt_lh_fmri) + self.l1_loss(pred_rh_fmri, gt_rh_fmri)
         loss_lh = torch.mean(self.adaptive_lh.lossfun((pred_lh_fmri - gt_lh_fmri)))
         loss_rh = torch.mean(self.adaptive_rh.lossfun((pred_rh_fmri - gt_rh_fmri)))
         l1_loss = loss_lh + loss_rh
-        pcc_loss = self.pcc(pred_lh_fmri, gt_lh_fmri) + self.pcc(pred_rh_fmri, gt_rh_fmri)
+        pcc_loss = self.pcc(pred_lh_fmri, gt_lh_fmri) + self.pcc(
+            pred_rh_fmri, gt_rh_fmri
+        )
         loss = l1_loss + pcc_loss
         # import pdb; pdb.set_trace()
 
@@ -64,45 +71,65 @@ class Metric:
         # selpearson = PearsonCorrCoef()
         self.args = args
         # Load the ROI classes mapping dictionaries
-        roi_mapping_files = ['mapping_prf-visualrois.npy', 'mapping_floc-bodies.npy',
-            'mapping_floc-faces.npy', 'mapping_floc-places.npy',
-            'mapping_floc-words.npy', 'mapping_streams.npy']
+        roi_mapping_files = [
+            "mapping_prf-visualrois.npy",
+            "mapping_floc-bodies.npy",
+            "mapping_floc-faces.npy",
+            "mapping_floc-places.npy",
+            "mapping_floc-words.npy",
+            "mapping_streams.npy",
+        ]
         self.roi_name_maps = []
         for r in roi_mapping_files:
-            self.roi_name_maps.append(np.load(os.path.join(args.data_dir, 'roi_masks', r),
-                allow_pickle=True).item())
+            self.roi_name_maps.append(
+                np.load(
+                    os.path.join(args.data_dir, "roi_masks", r), allow_pickle=True
+                ).item()
+            )
 
         # Load the ROI brain surface maps
-        lh_challenge_roi_files = ['lh.prf-visualrois_challenge_space.npy',
-            'lh.floc-bodies_challenge_space.npy', 'lh.floc-faces_challenge_space.npy',
-            'lh.floc-places_challenge_space.npy', 'lh.floc-words_challenge_space.npy',
-            'lh.streams_challenge_space.npy']
-        rh_challenge_roi_files = ['rh.prf-visualrois_challenge_space.npy',
-            'rh.floc-bodies_challenge_space.npy', 'rh.floc-faces_challenge_space.npy',
-            'rh.floc-places_challenge_space.npy', 'rh.floc-words_challenge_space.npy',
-            'rh.streams_challenge_space.npy']
+        lh_challenge_roi_files = [
+            "lh.prf-visualrois_challenge_space.npy",
+            "lh.floc-bodies_challenge_space.npy",
+            "lh.floc-faces_challenge_space.npy",
+            "lh.floc-places_challenge_space.npy",
+            "lh.floc-words_challenge_space.npy",
+            "lh.streams_challenge_space.npy",
+        ]
+        rh_challenge_roi_files = [
+            "rh.prf-visualrois_challenge_space.npy",
+            "rh.floc-bodies_challenge_space.npy",
+            "rh.floc-faces_challenge_space.npy",
+            "rh.floc-places_challenge_space.npy",
+            "rh.floc-words_challenge_space.npy",
+            "rh.streams_challenge_space.npy",
+        ]
         self.lh_challenge_rois = []
         self.rh_challenge_rois = []
         for r in range(len(lh_challenge_roi_files)):
-            self.lh_challenge_rois.append(np.load(os.path.join(args.data_dir, 'roi_masks',
-                lh_challenge_roi_files[r])))
-            self.rh_challenge_rois.append(np.load(os.path.join(args.data_dir, 'roi_masks',
-                rh_challenge_roi_files[r])))
-
+            self.lh_challenge_rois.append(
+                np.load(
+                    os.path.join(args.data_dir, "roi_masks", lh_challenge_roi_files[r])
+                )
+            )
+            self.rh_challenge_rois.append(
+                np.load(
+                    os.path.join(args.data_dir, "roi_masks", rh_challenge_roi_files[r])
+                )
+            )
 
     def __call__(self, pred_lh_fmri, pred_rh_fmri, gt_lh_fmri, gt_rh_fmri):
-
         # Empty correlation array of shape: (LH vertices)
         lh_correlation = np.zeros(pred_lh_fmri.shape[1])
         # Correlate each predicted LH vertex with the corresponding ground truth vertex
         for v in range(pred_lh_fmri.shape[1]):
-            lh_correlation[v] = corr(pred_lh_fmri[:,v], gt_lh_fmri[:,v])[0]
+            lh_correlation[v] = corr(pred_lh_fmri[:, v], gt_lh_fmri[:, v])[0]
 
         # Empty correlation array of shape: (RH vertices)
         rh_correlation = np.zeros(pred_rh_fmri.shape[1])
         # Correlate each predicted RH vertex with the corresponding ground truth vertex
         for v in range(pred_rh_fmri.shape[1]):
-            rh_correlation[v] = corr(pred_rh_fmri[:,v], gt_rh_fmri[:,v])[0]
+            rh_correlation[v] = corr(pred_rh_fmri[:, v], gt_rh_fmri[:, v])[0]
 
         # Select the correlation results vertices of each ROI
         roi_names = []
@@ -110,29 +137,33 @@ class Metric:
         rh_roi_correlation = []
         for r1 in range(len(self.lh_challenge_rois)):
             for r2 in self.roi_name_maps[r1].items():
-                if r2[0] != 0: # zeros indicate to vertices falling outside the ROI of interest
+                if (
+                    r2[0] != 0
+                ):  # zeros indicate to vertices falling outside the ROI of interest
                     roi_names.append(r2[1])
                     lh_roi_idx = np.where(self.lh_challenge_rois[r1] == r2[0])[0]
                     rh_roi_idx = np.where(self.rh_challenge_rois[r1] == r2[0])[0]
                     lh_roi_correlation.append(lh_correlation[lh_roi_idx])
                     rh_roi_correlation.append(rh_correlation[rh_roi_idx])
-        roi_names.append('All vertices')
+        roi_names.append("All vertices")
         lh_roi_correlation.append(lh_correlation)
         rh_roi_correlation.append(rh_correlation)
 
         # Create the plot
-        lh_median_roi_correlation = [np.median(lh_roi_correlation[r])
-            for r in range(len(lh_roi_correlation))]
-        rh_median_roi_correlation = [np.median(rh_roi_correlation[r])
-            for r in range(len(rh_roi_correlation))]
+        lh_median_roi_correlation = [
+            np.median(lh_roi_correlation[r]) for r in range(len(lh_roi_correlation))
+        ]
+        rh_median_roi_correlation = [
+            np.median(rh_roi_correlation[r]) for r in range(len(rh_roi_correlation))
+        ]
 
-
-        avg = (lh_median_roi_correlation[-1] + rh_median_roi_correlation[-1])/2
+        avg = (lh_median_roi_correlation[-1] + rh_median_roi_correlation[-1]) / 2
         return avg
 
 
 def get_model(args, distributed=True):
     from models.timm_model import AlgonautsTimm
+
     model = AlgonautsTimm(args)
 
     # move networks to gpu
@@ -161,6 +192,13 @@ def get_model(args, distributed=True):
 def get_dataloader(args):
     from torchvision import transforms
 
+    if args.dataset == "AlgonautsDataset":
+        dataset_fn = AlgonautsDataset
+    elif args.dataset == "AlgonautsCOCODataset":
+        dataset_fn = AlgonautsCOCODataset
+    else:
+        raise ("Invalid dataset")
+
     train_transform = transforms.Compose(
         [
             transforms.Resize((args.img_size, args.img_size)),
@@ -170,7 +208,6 @@ def get_dataloader(args):
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ]
     )
-
 
     valid_transform = transforms.Compose(
         [
@@ -187,25 +224,34 @@ def get_dataloader(args):
     root_data_dir = args.data_dir
     args.root_data_dir = root_data_dir
     # for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj07']:
-    for subject in ['subj01', 'subj02', 'subj03', 'subj04', 'subj05', 'subj06', 'subj07', 'subj08']:
+    for subject in [
+        "subj01",
+        "subj02",
+        "subj03",
+        "subj04",
+        "subj05",
+        "subj06",
+        "subj07",
+        "subj08",
+    ]:
         args.data_dir = f"{root_data_dir}/{subject}"
         args.csv_file = f"{args.data_dir}/kfold.csv"
-        train_dataset = AlgonautsDataset(
+        train_dataset = dataset_fn(
             data_dir=args.data_dir,
             csv_file=args.csv_file,
             transform=train_transform,
             fold=args.fold,
             num_folds=args.num_folds,
-            is_train=True
+            is_train=True,
         )
 
-        valid_dataset = AlgonautsDataset(
+        valid_dataset = dataset_fn(
             data_dir=args.data_dir,
             csv_file=args.csv_file,
             transform=valid_transform,
             fold=args.fold,
             num_folds=args.num_folds,
-            is_train=False
+            is_train=False,
         )
 
         print(len(train_dataset), len(valid_dataset))
@@ -227,9 +273,8 @@ def get_dataloader(args):
         shuffle=train_sampler is None,
         num_workers=args.num_workers,
         pin_memory=True,
-        sampler=train_sampler
+        sampler=train_sampler,
     )
-
 
     valid_sampler = (
         torch.utils.data.distributed.DistributedSampler(valid_datasets)
@@ -242,9 +287,8 @@ def get_dataloader(args):
         shuffle=False,
         num_workers=args.num_workers,
         pin_memory=True,
-        sampler=valid_sampler
+        sampler=valid_sampler,
     )
-
 
     # args.num_lh_output = train_dataset.num_lh_output
     # args.num_rh_output = train_dataset.num_rh_output
@@ -440,9 +484,7 @@ def train_one_fold(args):
     print("Training time {}".format(total_time_str))
 
 
-
 def train(args):
-
     # args.distributed = True
 
     if "WORLD_SIZE" in os.environ:
@@ -458,13 +500,14 @@ def train(args):
     cudnn.benchmark = True
 
     output_dir = args.output_dir
-
+    pretrained = args.pretrained
     folds = args.folds.split(",")
     for fold in folds:
         fold = int(fold)
         print("training fold ", fold)
         args.fold = fold
         args.output_dir = f"{output_dir}/{fold}/"
+        args.pretrained = f"{pretrained}/{fold}/best.pth"
         os.makedirs(args.output_dir, exist_ok=True)
         train_one_fold(args)
 
@@ -511,13 +554,12 @@ def train_one_epoch(
             if not args.distributed:
                 loss = loss.mean()
 
-
             if not is_train:
-                pred_lh_fmri = outputs['lh_fmri'].detach().cpu().numpy()
-                pred_rh_fmri = outputs['rh_fmri'].detach().cpu().numpy()
-                gt_lh_fmri = batch['lh_fmri'].detach().cpu().numpy()
-                gt_rh_fmri = batch['rh_fmri'].detach().cpu().numpy()
-                subject_id = batch['subject'].detach().cpu().numpy()
+                pred_lh_fmri = outputs["lh_fmri"].detach().cpu().numpy()
+                pred_rh_fmri = outputs["rh_fmri"].detach().cpu().numpy()
+                gt_lh_fmri = batch["lh_fmri"].detach().cpu().numpy()
+                gt_rh_fmri = batch["rh_fmri"].detach().cpu().numpy()
+                subject_id = batch["subject"].detach().cpu().numpy()
 
                 pred_lh_fmris.append(pred_lh_fmri)
                 pred_rh_fmris.append(pred_rh_fmri)
@@ -590,11 +632,11 @@ def train_one_epoch(
             metric_fn = Metric(args)
 
             avg = metric_fn(pred_lh_fmris_, pred_rh_fmris_, gt_lh_fmris_, gt_rh_fmris_)
-            metric_logger.update(**{f'corr_{subject+1}': avg})
+            metric_logger.update(**{f"corr_{subject+1}": avg})
             total += avg
 
         total = total / len(subject_unique_id)
-        metric_logger.update(**{'corr': total})
+        metric_logger.update(**{"corr": total})
         # for k, v in metric_dict.items():
         #     metric_logger.update(**{k: v})
     # gather the stats from all processes
@@ -609,4 +651,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     train(args)
-
