@@ -120,7 +120,7 @@ class AlgonautsDataset(Dataset):
                 self.fmri_dict[subject_id][prefix] = fmri_data
 
         data = fmri_data[index]
-        data = filter_noise(data)
+        # data = filter_noise(data)
         return data
 
     # def min_max_transform(self, arr, prefix='lh'):
@@ -230,7 +230,7 @@ class AlgonautsPseudoDataset(Dataset):
                 self.fmri_dict[subject_id][prefix] = fmri_data
 
         data = fmri_data[index]
-        data = filter_noise(data)
+        # data = filter_noise(data)
         return data
 
     def min_max_transform(self, arr, prefix="lh"):
@@ -326,7 +326,7 @@ class AlgonautsTestDataset(Dataset):
                 self.fmri_dict[subject_id][prefix] = fmri_data
 
         data = fmri_data[index]
-        data = filter_noise(data)
+        # data = filter_noise(data)
         return data
 
     # def min_max_transform(self, arr, prefix='lh'):
@@ -485,7 +485,7 @@ class AlgonautsCOCODataset(Dataset):
                 self.fmri_dict[subject_id][prefix] = fmri_data
 
         data = fmri_data[index]
-        data = filter_noise(data)
+        # data = filter_noise(data)
         return data
 
     def min_max_transform(self, arr, prefix="lh"):
