@@ -13,13 +13,13 @@ class AlgonautsTimm(nn.Module):
         )
 
         if os.path.isfile(args.pretrained):
-            checkpoint = torch.load(args.pretrained)['model']
+            checkpoint = torch.load(args.pretrained)["model"]
             backbone_dict = {}
             for k, v in checkpoint.items():
-                if 'backbone' in k:
-                    k_ = k[7:].replace('backbone.', '')
+                if "backbone" in k:
+                    k_ = k[7:].replace("backbone.", "")
                     backbone_dict[k_] = v
-                
+
             self.backbone.load_state_dict(backbone_dict)
             print(f"[+] Loaded: ", args.pretrained)
 
@@ -28,15 +28,24 @@ class AlgonautsTimm(nn.Module):
         subject_metadata = args.subject_metadata
 
         self.side = ["l", "r"]
+        self.fc_embedding = nn.ModuleDict()
         self.fc = nn.ModuleDict()
+
+        embedding_size = 512
 
         for side in self.side:
             fc = nn.ModuleDict()
+            fc_embedding = nn.ModuleDict()
             for roi_name, roi_index in subject_metadata[side].items():
                 roi_size = sum(roi_index)
                 if roi_size > 0:
-                    fc[roi_name] = nn.Linear(in_features, roi_size)
+                    fc_embedding[roi_name] = nn.Sequential(
+                        nn.Linear(in_features, embedding_size),
+                        # nn.BatchNorm1d(embedding_size, eps=1e-05),
+                    )
+                    fc[roi_name] = nn.Linear(embedding_size, roi_size)
             self.fc[side] = fc
+            self.fc_embedding[side] = fc_embedding
 
     def freeze_backbone(self):
         for param in self.backbone.parameters():
@@ -54,8 +63,11 @@ class AlgonautsTimm(nn.Module):
         for side in self.side:
             output_dict[side] = {}
             for roi_name, roi_fc in self.fc[side].items():
-                output = roi_fc(features)
+                fc_embedding = self.fc_embedding[side][roi_name]
+                embedding = fc_embedding(features)
+                output = roi_fc(embedding)
                 output_dict[side][roi_name] = output
+                output_dict[side][roi_name + "_embedding"] = embedding
 
         return output_dict
 

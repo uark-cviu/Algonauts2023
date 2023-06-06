@@ -108,6 +108,7 @@ class Criterion(nn.Module):
             # print("Mix")
         else:
             mixup = False
+
         for side in ["l", "r"]:
             # GT
             gt_fmri = batch[side]
@@ -118,10 +119,20 @@ class Criterion(nn.Module):
 
             roi_names = outputs[side].keys()
             for roi_name in roi_names:
+                if "embedding" in roi_name:
+                    continue
+
                 pred = outputs[side][roi_name]
-                # import pdb; pdb.set_trace()
                 gt = self.get_gt_roi(gt_fmri, side, roi_name)
                 loss = self.loss(pred, gt, side, roi_name)
+
+                embedding = outputs[side][roi_name + "_embedding"]
+                embedding = torch.nn.functional.normalize(embedding)
+                pred_corr = embedding @ embedding.T
+                gt_corr = torch.corrcoef(gt).detach()
+                loss_corr = (gt_corr - pred_corr) ** 2
+                loss_corr = loss_corr.mean()
+                loss += loss_corr
 
                 if mixup:
                     gt_mix = self.get_gt_roi(gt_fmri_mixed, side, roi_name)
@@ -578,6 +589,8 @@ def post_process_output(outputs, args):
     for side in ["l", "r"]:
         roi_names = outputs[side].keys()
         for roi_name in roi_names:
+            if "_embedding" in roi_name:
+                continue
             pred = outputs[side][roi_name]
             roi_idx = subject_metadata[side][roi_name]
 
@@ -639,9 +652,9 @@ def train_one_epoch(
             if isinstance(v, torch.Tensor):
                 batch[k] = batch[k].cuda(non_blocking=True)
 
-        if is_train and np.random.rand() < 0.5:
-            # import pdb; pdb.set_trace()
-            batch = mixup_data(batch, alpha=1.0, use_cuda=True)
+        # if is_train and np.random.rand() < 0.5:
+        #     # import pdb; pdb.set_trace()
+        #     batch = mixup_data(batch, alpha=1.0, use_cuda=True)
 
         with torch.cuda.amp.autocast(fp16_scaler is not None):
             if not is_train:
