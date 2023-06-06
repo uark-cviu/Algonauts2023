@@ -28,6 +28,33 @@ import robust_loss_pytorch
 import pickle
 
 
+def mixup_data(batch, alpha=1.0, use_cuda=True):
+    """Returns mixed inputs, pairs of targets, and lambda"""
+    if alpha > 0:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1
+
+    x = batch["image"]
+
+    batch_size = x.size()[0]
+    if use_cuda:
+        index = torch.randperm(batch_size).cuda()
+    else:
+        index = torch.randperm(batch_size)
+
+    mixed_x = lam * x + (1 - lam) * x[index, :]
+    # y_a, y_b = y, y[index]
+    batch["image"] = mixed_x
+    batch["index"] = index
+    batch["lam"] = lam
+    return batch
+
+
+# def mixup_criterion(criterion, pred, y_a, y_b, lam):
+#     return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+
 class Criterion(nn.Module):
     def __init__(self, args):
         super().__init__()
@@ -76,16 +103,33 @@ class Criterion(nn.Module):
     def forward(self, outputs, batch):
         total_loss = 0
         count = 0
+        if "lam" in batch:
+            mixup = True
+            # print("Mix")
+        else:
+            mixup = False
         for side in ["l", "r"]:
             # GT
             gt_fmri = batch[side]
+            if mixup:
+                index = batch["index"]
+                lam = batch["lam"]
+                gt_fmri_mixed = gt_fmri[index]
+
             roi_names = outputs[side].keys()
             for roi_name in roi_names:
                 pred = outputs[side][roi_name]
                 # import pdb; pdb.set_trace()
                 gt = self.get_gt_roi(gt_fmri, side, roi_name)
                 loss = self.loss(pred, gt, side, roi_name)
-                total_loss += loss
+
+                if mixup:
+                    gt_mix = self.get_gt_roi(gt_fmri_mixed, side, roi_name)
+                    loss_mix = self.loss(pred, gt_mix, side, roi_name)
+
+                    total_loss += lam * loss + (1 - lam) * loss_mix
+                else:
+                    total_loss += loss
                 count += 1
 
         return total_loss / count
@@ -594,6 +638,10 @@ def train_one_epoch(
         for k, v in batch.items():
             if isinstance(v, torch.Tensor):
                 batch[k] = batch[k].cuda(non_blocking=True)
+
+        if is_train and np.random.rand() < 0.5:
+            # import pdb; pdb.set_trace()
+            batch = mixup_data(batch, alpha=1.0, use_cuda=True)
 
         with torch.cuda.amp.autocast(fp16_scaler is not None):
             if not is_train:

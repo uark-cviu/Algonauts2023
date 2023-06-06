@@ -38,8 +38,8 @@ export OFFSET=${OFFSET}
 # model_name='vit_small_patch16_224'
 # model_name='convnext_base_in22ft1k'
 # model_name='seresnext101d_32x8d'
-model_name='coat_lite_medium_384.in1k'
-# model_name='convnext_xlarge.fb_in22k_ft_in1k_384'
+# model_name='coat_lite_medium_384.in1k'
+model_name='convnext_xlarge.fb_in22k_ft_in1k_384'
 # model_name='resnetrs420'
 # model_name='maxvit_large_tf_384.in21k_ft_in1k'
 # model_name='tf_efficientnet_b7.ns_jft_in1k'
@@ -84,7 +84,7 @@ fi
 
 echo "Run command ", $command
 
-output_dir=logs/finetune_onecycle/${subject}/${model_name}/
+output_dir=logs/finetune_onecycle_mixup/${subject}/${model_name}/
 # output_dir=/scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/${subject}/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/${subject}
