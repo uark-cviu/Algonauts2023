@@ -84,7 +84,7 @@ fi
 
 echo "Run command ", $command
 
-output_dir=logs/finetune_onecycle_corr_loss/${subject}/${model_name}/
+output_dir=logs/finetune_onecycle_vox_loss/${subject}/${model_name}/
 # output_dir=/scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/${subject}/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/${subject}

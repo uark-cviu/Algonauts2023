@@ -55,6 +55,24 @@ def mixup_data(batch, alpha=1.0, use_cuda=True):
 #     return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
 
 
+def vox_loss_fn(r, v, nu=0.5, delta=1.0):
+    # err = T.sum(huber(r, v, delta), dim=0)
+    err = torch.sum((r - v) ** 2, dim=0)
+    # squared correlation coefficient with 'leak'
+    cr = r - torch.mean(r, dim=0, keepdim=True)
+    cv = v - torch.mean(v, dim=0, keepdim=True)
+    wgt = torch.clamp(
+        torch.pow(torch.mean(cr * cv, dim=0), 2)
+        / ((torch.mean(cr**2, dim=0)) * (torch.mean(cv**2, dim=0)) + 1e-6),
+        min=nu,
+        max=1,
+    ).detach()
+
+    weighted_err = wgt * err  # error per voxel
+    loss = torch.sum(weighted_err) / torch.mean(wgt)
+    return loss
+
+
 class Criterion(nn.Module):
     def __init__(self, args):
         super().__init__()
@@ -91,10 +109,14 @@ class Criterion(nn.Module):
         return gt_fmri[:, np.where(roi_idx)[0]]
 
     def loss(self, pred, gt, side, roi_name):
-        pcc_loss = self.pcc(pred, gt)
-        l1_loss = self.l1_loss(pred, gt)
+        # pcc_loss = self.pcc(pred, gt)
+        # l1_loss = self.l1_loss(pred, gt)
+        # # adaptive_loss = self.adaptive_loss(pred, gt, side, roi_name)
+        # return pcc_loss + l1_loss
+
+        return vox_loss_fn(pred, gt)
         # adaptive_loss = self.adaptive_loss(pred, gt, side, roi_name)
-        return pcc_loss + l1_loss
+        # return pcc_loss + l1_loss
 
     def adaptive_loss(self, pred, gt, side, roi_name):
         loss_fn = self.adaptive_loss_dict[side][roi_name]
