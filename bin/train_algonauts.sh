@@ -39,9 +39,9 @@ export OFFSET=${OFFSET}
 # model_name='vit_small_patch16_224'
 # model_name='convnext_base_in22ft1k'
 # model_name='coat_lite_medium_384.in1k'
-model_name='mobilevitv2_175.cvnets_in22k_ft_in1k_384'
+# model_name='mobilevitv2_175.cvnets_in22k_ft_in1k_384'
 # model_name='caformer_b36.sail_in22k_ft_in1k_384'
-# model_name='convnext_xlarge.fb_in22k_ft_in1k_384'
+model_name='convnext_xlarge.fb_in22k_ft_in1k_384'
 # model_name='maxvit_large_tf_384.in21k_ft_in1k'
 # model_name='tf_efficientnet_b7.ns_jft_in1k'
 # model_name='resnetrs420'
@@ -50,7 +50,7 @@ model_name='mobilevitv2_175.cvnets_in22k_ft_in1k_384'
 # model_name='ssl_resnext50_32x4d'
 
 # Data
-batch_size=16
+batch_size=32
 lr=2.5e-4
 distributed=True
 epochs=15
@@ -89,7 +89,7 @@ echo "Run command ", $command
 # CUDA_VISIBLE_DEVICES=4 FOLDS=4 NGPUS=1 RUN_MODE=dist_new bash bin/train_algonauts.sh 2>&1 | tee fold_4.txt &
 
 # output_dir=logs/baseline_pcc_l1/${subject}/${model_name}/
-output_dir=logs/multisub/${model_name}/
+output_dir=logs/multisub_no6/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/
 csv_file=${data_dir}/kfold.csv

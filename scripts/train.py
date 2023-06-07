@@ -230,7 +230,7 @@ def get_dataloader(args):
         "subj03",
         "subj04",
         "subj05",
-        "subj06",
+        # "subj06",
         "subj07",
         "subj08",
     ]:
