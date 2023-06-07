@@ -227,12 +227,12 @@ def get_dataloader(args):
     for subject in [
         "subj01",
         "subj02",
-        "subj03",
-        "subj04",
+        # "subj03",
+        # "subj04",
         "subj05",
         # "subj06",
-        "subj07",
-        "subj08",
+        # "subj07",
+        # "subj08",
     ]:
         args.data_dir = f"{root_data_dir}/{subject}"
         args.csv_file = f"{args.data_dir}/kfold.csv"

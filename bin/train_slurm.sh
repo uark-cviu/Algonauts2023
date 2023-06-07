@@ -1,7 +1,7 @@
 #set -x
 
 function get_free_nodes {
-    all_nodes=$(sinfo -N | grep idle | grep -v c1905 | grep ${1})
+    all_nodes=$(sinfo -N | grep idle | grep -v c1907 | grep ${1})
 
     i=0
     free_nodes=()
