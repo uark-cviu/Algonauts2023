@@ -99,6 +99,8 @@ def post_process_output(outputs, args):
     for side in ["l", "r"]:
         roi_names = outputs[side].keys()
         for roi_name in roi_names:
+            if "_embedding" in roi_name:
+                continue
             pred = outputs[side][roi_name]
             roi_idx = subject_metadata[side][roi_name]
 
@@ -205,8 +207,8 @@ def train(args):
     np.save(f"{output_dir}/lh_pred_test.npy", pred_lh_final)
     np.save(f"{output_dir}/rh_pred_test.npy", pred_rh_final)
 
-    np.save(f"{output_dir}/lh_pred_fold.npy", pred_lh_folds)
-    np.save(f"{output_dir}/rh_pred_fold.npy", pred_rh_folds)
+    # np.save(f"{output_dir}/lh_pred_fold.npy", pred_lh_folds)
+    # np.save(f"{output_dir}/rh_pred_fold.npy", pred_rh_folds)
 
 
 if __name__ == "__main__":
