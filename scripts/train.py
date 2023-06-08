@@ -595,7 +595,7 @@ def train(args):
     output_dir = args.output_dir
     pretrained = args.pretrained
 
-    for fold in [0, 1, 2, 3, 4]:
+    for fold in [4, 3, 2, 1, 0]:
         print("training fold ", fold)
         args.fold = fold
         args.output_dir = f"{output_dir}/{fold}/"

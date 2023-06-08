@@ -84,13 +84,13 @@ fi
 
 echo "Run command ", $command
 
-output_dir=logs/finetune_onecycle_vox_loss/${subject}/${model_name}/
+output_dir=logs/finetune_onecycle_vox_loss_no7/${subject}/${model_name}/
 # output_dir=/scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/${subject}/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/${subject}
 csv_file=${data_dir}/kfold.csv
 
-pretrained=logs/multisub/${model_name}/
+pretrained=logs/multisub_no7/${model_name}/
 # pseudo_dir=predictions_vision/ensemble_convnext_xlarge_seresnext101d_32x8d/
 pseudo_dir='none'
 
