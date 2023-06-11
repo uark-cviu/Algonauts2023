@@ -178,6 +178,17 @@ def train(args):
 
                 pred_lh_fmri, pred_rh_fmri = post_process_output(outputs, train_args)
 
+                # with torch.no_grad():
+                #     batch["image"] = batch["image"].flip(3)
+                #     outputs_flip = model(batch)
+
+                #     pred_lh_fmri_flip, pred_rh_fmri_flip = post_process_output(
+                #         outputs_flip, train_args
+                #     )
+
+                #     pred_lh_fmri = (pred_lh_fmri + pred_lh_fmri_flip) / 2
+                #     pred_rh_fmri = (pred_rh_fmri + pred_rh_fmri_flip) / 2
+
                 # pred_lh_fmri = outputs["lh_fmri"].detach().cpu().numpy()
                 # pred_rh_fmri = outputs["rh_fmri"].detach().cpu().numpy()
 
