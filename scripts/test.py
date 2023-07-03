@@ -96,7 +96,9 @@ def post_process_output(outputs, args):
     subject_metadata = args.subject_metadata
     pred_l, pred_r = None, None
     counter_l, counter_r = None, None
+    pred_l_all, pred_r_all = None, None
     for side in ["l", "r"]:
+        pred_all = outputs[side + "_all"]
         roi_names = outputs[side].keys()
         for roi_name in roi_names:
             if "_embedding" in roi_name:
@@ -122,12 +124,20 @@ def post_process_output(outputs, args):
                 # counter_r[roi_idx[np.where(pred_r[roi_idx] != 0)[0]]] += 1
                 pred_r[:, np.where(roi_idx)[0]] += pred.detach().cpu().numpy()
 
+        if side == "l":
+            pred_l_all = pred_all.detach().cpu().numpy()
+        else:
+            pred_r_all = pred_all.detach().cpu().numpy()
+
     # import pdb; pdb.set_trace()
     counter_l[np.where(counter_l == 0)] = 1
     counter_r[np.where(counter_r == 0)] = 1
 
     pred_l = pred_l / counter_l
     pred_r = pred_r / counter_r
+
+    pred_l = (pred_l + pred_l_all) / 2
+    pred_r = (pred_r + pred_r_all) / 2
     return pred_l, pred_r
 
 

@@ -109,12 +109,12 @@ class Criterion(nn.Module):
         return gt_fmri[:, np.where(roi_idx)[0]]
 
     def loss(self, pred, gt, side, roi_name):
-        # pcc_loss = self.pcc(pred, gt)
-        # l1_loss = self.l1_loss(pred, gt)
-        # # adaptive_loss = self.adaptive_loss(pred, gt, side, roi_name)
-        # return pcc_loss + l1_loss
+        pcc_loss = self.pcc(pred, gt)
+        l1_loss = self.l1_loss(pred, gt)
+        # adaptive_loss = self.adaptive_loss(pred, gt, side, roi_name)
+        return pcc_loss + l1_loss
 
-        return vox_loss_fn(pred, gt)
+        # return vox_loss_fn(pred, gt)
         # adaptive_loss = self.adaptive_loss(pred, gt, side, roi_name)
         # return pcc_loss + l1_loss
 
@@ -139,6 +139,13 @@ class Criterion(nn.Module):
                 lam = batch["lam"]
                 gt_fmri_mixed = gt_fmri[index]
 
+            pred_all = outputs[side + "_all"]
+            gt_all = gt_fmri
+
+            loss_all = self.loss(pred_all, gt_all, None, None)
+            total_loss += loss_all
+            count += 1
+
             roi_names = outputs[side].keys()
             for roi_name in roi_names:
                 if "embedding" in roi_name:
@@ -148,13 +155,13 @@ class Criterion(nn.Module):
                 gt = self.get_gt_roi(gt_fmri, side, roi_name)
                 loss = self.loss(pred, gt, side, roi_name)
 
-                embedding = outputs[side][roi_name + "_embedding"]
-                embedding = torch.nn.functional.normalize(embedding)
-                pred_corr = embedding @ embedding.T
-                gt_corr = torch.corrcoef(gt).detach()
-                loss_corr = (gt_corr - pred_corr) ** 2
-                loss_corr = loss_corr.mean()
-                loss += loss_corr
+                # embedding = outputs[side][roi_name + "_embedding"]
+                # embedding = torch.nn.functional.normalize(embedding)
+                # pred_corr = embedding @ embedding.T
+                # gt_corr = torch.corrcoef(gt).detach()
+                # loss_corr = (gt_corr - pred_corr) ** 2
+                # loss_corr = loss_corr.mean()
+                # loss += loss_corr
 
                 if mixup:
                     gt_mix = self.get_gt_roi(gt_fmri_mixed, side, roi_name)
@@ -608,7 +615,9 @@ def post_process_output(outputs, args):
     subject_metadata = args.subject_metadata
     pred_l, pred_r = None, None
     counter_l, counter_r = None, None
+    pred_l_all, pred_r_all = None, None
     for side in ["l", "r"]:
+        pred_all = outputs[side + "_all"]
         roi_names = outputs[side].keys()
         for roi_name in roi_names:
             if "_embedding" in roi_name:
@@ -634,12 +643,20 @@ def post_process_output(outputs, args):
                 # counter_r[roi_idx[np.where(pred_r[roi_idx] != 0)[0]]] += 1
                 pred_r[:, np.where(roi_idx)[0]] += pred.detach().cpu().numpy()
 
+        if side == "l":
+            pred_l_all = pred_all.detach().cpu().numpy()
+        else:
+            pred_r_all = pred_all.detach().cpu().numpy()
+
     # import pdb; pdb.set_trace()
     counter_l[np.where(counter_l == 0)] = 1
     counter_r[np.where(counter_r == 0)] = 1
 
     pred_l = pred_l / counter_l
     pred_r = pred_r / counter_r
+
+    pred_l = (pred_l + pred_l_all) / 2
+    pred_r = (pred_r + pred_r_all) / 2
     return pred_l, pred_r
 
 
