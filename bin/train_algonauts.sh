@@ -57,6 +57,7 @@ epochs=12
 img_size=384
 saveckp_freq=5
 scheduler='onecycle'
+num_folds=5
 
 JOB_NAME=${model_name}-${subject}
 
@@ -84,7 +85,7 @@ fi
 
 echo "Run command ", $command
 
-output_dir=logs/finetune_leaveone_roi_split_and_all/${subject}/${model_name}/
+output_dir=logs/finetune_leaveone_roi_split_and_all_fix_metric/${subject}/${model_name}/
 # output_dir=/scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/${subject}/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/${subject}
@@ -111,5 +112,6 @@ PYTHONPATH=. $command \
         --saveckp_freq ${saveckp_freq} \
         --scheduler ${scheduler} \
         --num_workers 4 \
+        --num_folds ${num_folds} \
         --use_fp16 False \
         --use_ema True

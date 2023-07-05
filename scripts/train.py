@@ -255,16 +255,16 @@ class Metric:
                     rh_roi_idx = np.where(self.rh_challenge_rois[r1] == r2[0])[0]
                     lh_roi_correlation.append(lh_correlation[lh_roi_idx])
                     rh_roi_correlation.append(rh_correlation[rh_roi_idx])
-        roi_names.append("All vertices")
-        lh_roi_correlation.append(lh_correlation)
-        rh_roi_correlation.append(rh_correlation)
+        # roi_names.append("All vertices")
+        # lh_roi_correlation.append(lh_correlation)
+        # rh_roi_correlation.append(rh_correlation)
 
         # Create the plot
         lh_median_roi_correlation = [
-            np.median(lh_roi_correlation[r]) for r in range(len(lh_roi_correlation))
+            np.mean(lh_roi_correlation[r]) for r in range(len(lh_roi_correlation))
         ]
         rh_median_roi_correlation = [
-            np.median(rh_roi_correlation[r]) for r in range(len(rh_roi_correlation))
+            np.mean(rh_roi_correlation[r]) for r in range(len(rh_roi_correlation))
         ]
 
         lh_median_roi_correlation = np.array(lh_median_roi_correlation)
