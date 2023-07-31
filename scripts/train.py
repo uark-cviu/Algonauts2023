@@ -78,6 +78,8 @@ class Criterion(nn.Module):
         super().__init__()
         self.args = args
         self.subject_metadata = args.subject_metadata
+        self.nc_lh = args.nc_lh
+        self.nc_rh = args.nc_rh
         self.l1_loss = nn.SmoothL1Loss()
         self.mse_loss = nn.MSELoss()
         self.pcc = PCCLoss()
@@ -108,8 +110,16 @@ class Criterion(nn.Module):
         roi_idx = self.subject_metadata[side][roi_name]
         return gt_fmri[:, np.where(roi_idx)[0]]
 
-    def loss(self, pred, gt, side, roi_name):
-        pcc_loss = self.pcc(pred, gt)
+    def get_nc_roi(self, side, roi_name):
+        roi_idx = self.subject_metadata[side][roi_name]
+        if side == "l":
+            nc = self.nc_lh
+        else:
+            nc = self.nc_rh
+        return nc[np.where(roi_idx)[0]]
+
+    def loss(self, pred, gt, side=None, roi_name=None, nc=None):
+        pcc_loss = self.pcc(pred, gt, nc)
         l1_loss = self.l1_loss(pred, gt)
         # adaptive_loss = self.adaptive_loss(pred, gt, side, roi_name)
         return pcc_loss + l1_loss
@@ -153,7 +163,8 @@ class Criterion(nn.Module):
 
                 pred = outputs[side][roi_name]
                 gt = self.get_gt_roi(gt_fmri, side, roi_name)
-                loss = self.loss(pred, gt, side, roi_name)
+                nc = self.get_nc_roi(side, roi_name)
+                loss = self.loss(pred, gt, side, roi_name, nc)
 
                 # embedding = outputs[side][roi_name + "_embedding"]
                 # embedding = torch.nn.functional.normalize(embedding)
@@ -382,6 +393,7 @@ def get_dataloader(args):
         num_workers=args.num_workers,
         pin_memory=True,
         sampler=train_sampler,
+        drop_last=True,
     )
 
     valid_sampler = (
@@ -396,6 +408,7 @@ def get_dataloader(args):
         num_workers=args.num_workers,
         pin_memory=True,
         sampler=valid_sampler,
+        drop_last=True,
     )
 
     return train_loader, valid_loader
@@ -770,5 +783,12 @@ if __name__ == "__main__":
     with open("subject_meta.pkl", "rb") as f:
         subject_metadata = pickle.load(f)
         args.subject_metadata = subject_metadata[args.subject]
+
+    nc_lh = np.load(f"data/noise_ceiling/{args.subject}/lh.npy")
+    nc_rh = np.load(f"data/noise_ceiling/{args.subject}/rh.npy")
+
+    args.nc_lh = nc_lh
+    args.nc_rh = nc_rh
+
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     train(args)

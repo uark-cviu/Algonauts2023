@@ -45,26 +45,28 @@ class AlgonautsTimm(nn.Module):
     def __init__(self, args) -> None:
         super().__init__()
 
-        # self.backbone = timm.create_model(
-        #     model_name=args.model_name, pretrained=True, num_classes=0
-        # )
-
         if args.model_name in torchvision_models.__dict__.keys():
             self.backbone = torchvision_models.__dict__[args.model_name](
                 weights="DEFAULT"
             )
-        else:
-            self.backbone = get_convnext_coco(args.model_name)
+            if hasattr(self.backbone, "fc"):
+                embed_dim = self.backbone.fc.weight.shape[1]
+                self.backbone.fc = nn.Identity()
+            elif hasattr(self.backbone, "classifier"):
+                embed_dim = self.backbone.classifier[-1].weight.shape[1]
+                self.backbone.classifier = nn.Identity()
+            elif hasattr(self.backbone, "head"):
+                embed_dim = self.backbone.head.weight.shape[1]
+                self.backbone.head = nn.Identity()
 
-        if hasattr(self.backbone, "fc"):
-            embed_dim = self.backbone.fc.weight.shape[1]
-            self.backbone.fc = nn.Identity()
-        elif hasattr(self.backbone, "classifier"):
-            embed_dim = self.backbone.classifier[-1].weight.shape[1]
-            self.backbone.classifier = nn.Identity()
-        elif hasattr(self.backbone, "head"):
-            embed_dim = self.backbone.head.weight.shape[1]
-            self.backbone.head = nn.Identity()
+            in_features = embed_dim
+        else:
+            self.backbone = timm.create_model(
+                model_name=args.model_name, pretrained=True, num_classes=0
+            )
+            in_features = self.backbone.num_features
+
+        # in_features = in_features + 512  # clip_features
 
         if os.path.isfile(args.pretrained):
             checkpoint = torch.load(args.pretrained)["model"]
@@ -76,9 +78,6 @@ class AlgonautsTimm(nn.Module):
 
             self.backbone.load_state_dict(backbone_dict)
             print(f"[+] Loaded: ", args.pretrained)
-
-        # in_features = self.backbone.num_features
-        in_features = embed_dim
 
         subject_metadata = args.subject_metadata
 
@@ -116,6 +115,10 @@ class AlgonautsTimm(nn.Module):
         bs = image.shape[0]
         features = self.backbone(image)
         features = features.view(bs, -1)
+
+        # clip_features = batch["clip_features"]
+        # clip_features = clip_features.view(bs, -1)
+        # features = torch.cat([features, clip_features], axis=1)
 
         output_dict = {}
         for side in self.side:

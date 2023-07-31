@@ -98,6 +98,13 @@ class AlgonautsDataset(Dataset):
             self.min_max_lh = [-11.138769, 10.5266905]
             self.min_max_rh = [-9.20942, 10.573892]
 
+    def load_clip_features(self, img_path):
+        nsd_id = int(img_path.split("/")[-1].split(".")[0].split("-")[-1])
+        data_dir = "data/clip0_fea"
+        nsd_id = str(nsd_id).zfill(6)
+        features = np.load(f"{data_dir}/{nsd_id}.npy")
+        return features
+
     def load_image(self, img_path):
         return Image.open(img_path).convert("RGB")
 
@@ -152,10 +159,17 @@ class AlgonautsDataset(Dataset):
 
         rh_fmri = self.load_fmri(img_path, prefix="rh")
         rh_fmri = self.min_max_transform(rh_fmri, prefix="rh")
+
+        clip_features = self.load_clip_features(img_path)
         if self.transform:
             img = self.transform(img)
 
-        return {"image": img, "l": lh_fmri, "r": rh_fmri}
+        return {
+            "image": img,
+            "l": lh_fmri,
+            "r": rh_fmri,
+            "clip_features": clip_features,
+        }
 
 
 class AlgonautsPseudoDataset(Dataset):
@@ -307,6 +321,14 @@ class AlgonautsTestDataset(Dataset):
     def load_image(self, img_path):
         return Image.open(img_path).convert("RGB")
 
+    def load_clip_features(self, img_path):
+        img_path = str(img_path)
+        nsd_id = int(img_path.split("/")[-1].split(".")[0].split("-")[-1])
+        data_dir = "data/clip0_fea"
+        nsd_id = str(nsd_id).zfill(6)
+        features = np.load(f"{data_dir}/{nsd_id}.npy")
+        return features
+
     def load_fmri(self, img_path, prefix="lh"):
         subject_id = img_path.split("/")[-4]
         index = (
@@ -356,9 +378,9 @@ class AlgonautsTestDataset(Dataset):
         if self.transform:
             img = self.transform(img)
 
-        return {
-            "image": img,
-        }
+        clip_features = self.load_clip_features(img_path)
+
+        return {"image": img, "clip_features": clip_features}
 
 
 class AlgonautsCOCODataset(Dataset):

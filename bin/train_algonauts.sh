@@ -39,7 +39,7 @@ export OFFSET=${OFFSET}
 # model_name='convnext_base_in22ft1k'
 # model_name='seresnext101d_32x8d'
 # model_name='coat_lite_medium_384.in1k'
-model_name='convnext_xlarge_coco'
+model_name='convnext_xlarge.fb_in22k_ft_in1k_384'
 # model_name='resnetrs420'
 # model_name='maxvit_large_tf_384.in21k_ft_in1k'
 # model_name='tf_efficientnet_b7.ns_jft_in1k'
@@ -85,13 +85,13 @@ fi
 
 echo "Run command ", $command
 
-output_dir=logs_tv/finetune_0/${subject}/${model_name}/
+output_dir=logs_new_loss_nc/finetune_0/${subject}/${model_name}/
 # output_dir=/scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/${subject}/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/${subject}
 csv_file=${data_dir}/kfold.csv
 
-pretrained=logs_tv/leaveone/${subject}/${model_name}/
+pretrained=logs/leaveone/${subject}/${model_name}/
 # pseudo_dir=predictions_vision/ensemble_convnext_xlarge_seresnext101d_32x8d/
 pseudo_dir='none'
 
