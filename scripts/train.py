@@ -21,10 +21,56 @@ from schedulers import OneCycleLRWithWarmup
 from utils import dino as utils
 from utils.algonauts_parser import get_args_parser
 from datasets.algonauts_2023 import AlgonautsDataset
+from datasets.algonauts_coco import AlgonautsCOCODataset
 from scipy.stats import pearsonr as corr
 from criterions.pcc import PCCLoss
 import robust_loss_pytorch
 import pickle
+
+
+def mixup_data(batch, alpha=1.0, use_cuda=True):
+    """Returns mixed inputs, pairs of targets, and lambda"""
+    if alpha > 0:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1
+
+    x = batch["image"]
+
+    batch_size = x.size()[0]
+    if use_cuda:
+        index = torch.randperm(batch_size).cuda()
+    else:
+        index = torch.randperm(batch_size)
+
+    mixed_x = lam * x + (1 - lam) * x[index, :]
+    # y_a, y_b = y, y[index]
+    batch["image"] = mixed_x
+    batch["index"] = index
+    batch["lam"] = lam
+    return batch
+
+
+# def mixup_criterion(criterion, pred, y_a, y_b, lam):
+#     return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+
+def vox_loss_fn(r, v, nu=0.5, delta=1.0):
+    # err = T.sum(huber(r, v, delta), dim=0)
+    err = torch.sum((r - v) ** 2, dim=0)
+    # squared correlation coefficient with 'leak'
+    cr = r - torch.mean(r, dim=0, keepdim=True)
+    cv = v - torch.mean(v, dim=0, keepdim=True)
+    wgt = torch.clamp(
+        torch.pow(torch.mean(cr * cv, dim=0), 2)
+        / ((torch.mean(cr**2, dim=0)) * (torch.mean(cv**2, dim=0)) + 1e-6),
+        min=nu,
+        max=1,
+    ).detach()
+
+    weighted_err = wgt * err  # error per voxel
+    loss = torch.sum(weighted_err) / torch.mean(wgt)
+    return loss
 
 
 class Criterion(nn.Module):
@@ -32,20 +78,24 @@ class Criterion(nn.Module):
         super().__init__()
         self.args = args
         self.subject_metadata = args.subject_metadata
+        self.nc_lh = args.nc_lh
+        self.nc_rh = args.nc_rh
         self.l1_loss = nn.SmoothL1Loss()
         self.mse_loss = nn.MSELoss()
         self.pcc = PCCLoss()
 
         self.adaptive_loss_dict = {}
-        for side in ['l', 'r']:
+        for side in ["l", "r"]:
             self.adaptive_loss_dict[side] = {}
             roi_names = self.subject_metadata[side].keys()
             for roi_name in roi_names:
                 num_output = self.subject_metadata[side][roi_name].sum()
-                # loss_fn = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
-                #     num_dims = num_output, float_dtype=np.float32, device='cuda:0'
-                # )
-                loss_fn = self.l1_loss
+                loss_fn = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
+                    num_dims=num_output,
+                    float_dtype=np.float32,
+                    device=f"cuda:{args.gpu}",
+                )
+                # loss_fn = self.l1_loss
                 self.adaptive_loss_dict[side][roi_name] = loss_fn
 
         # self.adaptive_lh = robust_loss_pytorch.adaptive.AdaptiveLossFunction(
@@ -60,12 +110,24 @@ class Criterion(nn.Module):
         roi_idx = self.subject_metadata[side][roi_name]
         return gt_fmri[:, np.where(roi_idx)[0]]
 
-    def loss(self, pred, gt, side, roi_name):
-        pcc_loss = self.pcc(pred, gt)
+    def get_nc_roi(self, side, roi_name):
+        roi_idx = self.subject_metadata[side][roi_name]
+        if side == "l":
+            nc = self.nc_lh
+        else:
+            nc = self.nc_rh
+        return nc[np.where(roi_idx)[0]]
+
+    def loss(self, pred, gt, side=None, roi_name=None, nc=None):
+        pcc_loss = self.pcc(pred, gt, nc)
         l1_loss = self.l1_loss(pred, gt)
         # adaptive_loss = self.adaptive_loss(pred, gt, side, roi_name)
         return pcc_loss + l1_loss
-    
+
+        # return vox_loss_fn(pred, gt)
+        # adaptive_loss = self.adaptive_loss(pred, gt, side, roi_name)
+        # return pcc_loss + l1_loss
+
     def adaptive_loss(self, pred, gt, side, roi_name):
         loss_fn = self.adaptive_loss_dict[side][roi_name]
         return torch.mean(loss_fn.lossfun((pred - gt)))
@@ -73,16 +135,52 @@ class Criterion(nn.Module):
     def forward(self, outputs, batch):
         total_loss = 0
         count = 0
-        for side in self.args.side:
+        if "lam" in batch:
+            mixup = True
+            # print("Mix")
+        else:
+            mixup = False
+
+        for side in ["l", "r"]:
             # GT
             gt_fmri = batch[side]
+            if mixup:
+                index = batch["index"]
+                lam = batch["lam"]
+                gt_fmri_mixed = gt_fmri[index]
+
+            pred_all = outputs[side + "_all"]
+            gt_all = gt_fmri
+
+            loss_all = self.loss(pred_all, gt_all, None, None)
+            total_loss += loss_all
+            count += 1
+
             roi_names = outputs[side].keys()
             for roi_name in roi_names:
+                if "embedding" in roi_name:
+                    continue
+
                 pred = outputs[side][roi_name]
-                # import pdb; pdb.set_trace()
                 gt = self.get_gt_roi(gt_fmri, side, roi_name)
-                loss = self.loss(pred, gt, side, roi_name)
-                total_loss += loss
+                nc = self.get_nc_roi(side, roi_name)
+                loss = self.loss(pred, gt, side, roi_name, nc)
+
+                # embedding = outputs[side][roi_name + "_embedding"]
+                # embedding = torch.nn.functional.normalize(embedding)
+                # pred_corr = embedding @ embedding.T
+                # gt_corr = torch.corrcoef(gt).detach()
+                # loss_corr = (gt_corr - pred_corr) ** 2
+                # loss_corr = loss_corr.mean()
+                # loss += loss_corr
+
+                if mixup:
+                    gt_mix = self.get_gt_roi(gt_fmri_mixed, side, roi_name)
+                    loss_mix = self.loss(pred, gt_mix, side, roi_name)
+
+                    total_loss += lam * loss + (1 - lam) * loss_mix
+                else:
+                    total_loss += loss
                 count += 1
 
         return total_loss / count
@@ -141,53 +239,58 @@ class Metric:
                 )
             )
 
-
-    def pearson_corr(self, pred, gt, side):
+    def __call__(self, pred_lh_fmri, pred_rh_fmri, gt_lh_fmri, gt_rh_fmri):
         # Empty correlation array of shape: (LH vertices)
-        correlation = np.zeros(pred.shape[1])
+        lh_correlation = np.zeros(pred_lh_fmri.shape[1])
         # Correlate each predicted LH vertex with the corresponding ground truth vertex
-        for v in range(pred.shape[1]):
-            correlation[v] = corr(pred[:, v], gt[:, v])[0]
+        for v in range(pred_lh_fmri.shape[1]):
+            lh_correlation[v] = corr(pred_lh_fmri[:, v], gt_lh_fmri[:, v])[0]
+
+        # Empty correlation array of shape: (RH vertices)
+        rh_correlation = np.zeros(pred_rh_fmri.shape[1])
+        # Correlate each predicted RH vertex with the corresponding ground truth vertex
+        for v in range(pred_rh_fmri.shape[1]):
+            rh_correlation[v] = corr(pred_rh_fmri[:, v], gt_rh_fmri[:, v])[0]
 
         # Select the correlation results vertices of each ROI
         roi_names = []
-        roi_correlation = []
+        lh_roi_correlation = []
+        rh_roi_correlation = []
         for r1 in range(len(self.lh_challenge_rois)):
             for r2 in self.roi_name_maps[r1].items():
                 if (
                     r2[0] != 0
                 ):  # zeros indicate to vertices falling outside the ROI of interest
                     roi_names.append(r2[1])
-                    if side == 'l':
-                        roi_idx = np.where(self.lh_challenge_rois[r1] == r2[0])[0]
-                    else:
-                        roi_idx = np.where(self.rh_challenge_rois[r1] == r2[0])[0]
-                    roi_correlation.append(correlation[roi_idx])
-        roi_names.append("All vertices")
-        roi_correlation.append(correlation)
+                    lh_roi_idx = np.where(self.lh_challenge_rois[r1] == r2[0])[0]
+                    rh_roi_idx = np.where(self.rh_challenge_rois[r1] == r2[0])[0]
+                    lh_roi_correlation.append(lh_correlation[lh_roi_idx])
+                    rh_roi_correlation.append(rh_correlation[rh_roi_idx])
+        # roi_names.append("All vertices")
+        # lh_roi_correlation.append(lh_correlation)
+        # rh_roi_correlation.append(rh_correlation)
 
         # Create the plot
-        median_roi_correlation = [
-            np.median(roi_correlation[r]) for r in range(len(roi_correlation))
+        lh_median_roi_correlation = [
+            np.mean(lh_roi_correlation[r]) for r in range(len(lh_roi_correlation))
+        ]
+        rh_median_roi_correlation = [
+            np.mean(rh_roi_correlation[r]) for r in range(len(rh_roi_correlation))
         ]
 
-        median_roi_correlation = np.array(median_roi_correlation)
+        lh_median_roi_correlation = np.array(lh_median_roi_correlation)
+        rh_median_roi_correlation = np.array(rh_median_roi_correlation)
 
-        median_roi_correlation = median_roi_correlation[~np.isnan(median_roi_correlation)]
+        lh_median_roi_correlation = lh_median_roi_correlation[
+            ~np.isnan(lh_median_roi_correlation)
+        ]
+        rh_median_roi_correlation = rh_median_roi_correlation[
+            ~np.isnan(rh_median_roi_correlation)
+        ]
 
-        avg = median_roi_correlation.mean()
+        avg = (lh_median_roi_correlation.mean() + rh_median_roi_correlation.mean()) / 2
 
-        return avg
-
-    def __call__(self, pred_gt_dict):
-        avg = 0
-        for side in self.args.side:
-            avg += self.pearson_corr(pred_gt_dict[side]['pred'], pred_gt_dict[side]['gt'], side)
-
-        avg = avg / len(self.args.side)
-        return {
-            'corr': avg
-        }
+        return {"corr": avg}
 
 
 def get_model(args, distributed=True):
@@ -251,6 +354,24 @@ def get_dataloader(args):
         is_train=True,
     )
 
+    args.num_lh_output = train_dataset.num_lh_output
+    args.num_rh_output = train_dataset.num_rh_output
+
+    args.min_max_lh = train_dataset.min_max_lh
+    args.min_max_rh = train_dataset.min_max_rh
+
+    if args.pseudo_dir != "none":
+        print("[+] Pseudo Training")
+        from datasets.algonauts_2023 import AlgonautsPseudoDataset
+
+        pseudo_dataset = AlgonautsPseudoDataset(
+            data_dir=args.data_dir,
+            transform=train_transform,
+            pseudo_dir=args.pseudo_dir,
+        )
+
+        train_dataset = torch.utils.data.ConcatDataset([train_dataset, pseudo_dataset])
+
     valid_dataset = AlgonautsDataset(
         data_dir=args.data_dir,
         csv_file=args.csv_file,
@@ -272,6 +393,7 @@ def get_dataloader(args):
         num_workers=args.num_workers,
         pin_memory=True,
         sampler=train_sampler,
+        drop_last=True,
     )
 
     valid_sampler = (
@@ -286,13 +408,8 @@ def get_dataloader(args):
         num_workers=args.num_workers,
         pin_memory=True,
         sampler=valid_sampler,
+        drop_last=True,
     )
-
-    args.num_lh_output = train_dataset.num_lh_output
-    args.num_rh_output = train_dataset.num_rh_output
-
-    args.min_max_lh = train_dataset.min_max_lh
-    args.min_max_rh = train_dataset.min_max_rh
 
     return train_loader, valid_loader
 
@@ -457,7 +574,7 @@ def train_one_fold(args):
         if is_save_best:
             utils.save_on_master(save_dict, os.path.join(args.output_dir, "best.pth"))
 
-        utils.save_on_master(save_dict, os.path.join(args.output_dir, "last.pth"))
+        # utils.save_on_master(save_dict, os.path.join(args.output_dir, "last.pth"))
 
         log_train_stats = {
             **{f"train_{k}": v for k, v in train_stats.items()},
@@ -502,43 +619,58 @@ def train(args):
         print("training fold ", fold)
         args.fold = fold
         args.output_dir = f"{output_dir}/{fold}/"
-        args.pretrained = f"{pretrained}/{fold}/best.pth"
+        args.pretrained = f"{pretrained}/best.pth"
         os.makedirs(args.output_dir, exist_ok=True)
         train_one_fold(args)
 
 
-def post_process_output_side(outputs, subject_metadata, side):
-    pred_side = None
-    counter = None
-
-    num_output = args.num_lh_output if side == 'l' else args.num_rh_output
-
-    roi_names = outputs[side].keys()
-    for roi_name in roi_names:
-        pred = outputs[side][roi_name]
-        roi_idx = subject_metadata[side][roi_name]
-
-        batch_size = pred.shape[0]
-        
-        if pred_side is None:
-            pred_side = np.zeros((batch_size, num_output))
-            counter = np.zeros((batch_size, num_output))
-        counter += roi_idx
-        pred_side[:, np.where(roi_idx)[0]] += pred.detach().cpu().numpy()
-
-    counter[np.where(counter == 0)] = 1
-    pred_side = pred_side / counter
-    return pred_side
-
-
 def post_process_output(outputs, args):
     subject_metadata = args.subject_metadata
-    ret_dict = {}
-    for side in args.side:
-        pred_side = post_process_output_side(outputs, subject_metadata, side)
-        ret_dict[side] = pred_side
+    pred_l, pred_r = None, None
+    counter_l, counter_r = None, None
+    pred_l_all, pred_r_all = None, None
+    for side in ["l", "r"]:
+        pred_all = outputs[side + "_all"]
+        roi_names = outputs[side].keys()
+        for roi_name in roi_names:
+            if "_embedding" in roi_name:
+                continue
+            pred = outputs[side][roi_name]
+            roi_idx = subject_metadata[side][roi_name]
 
-    return ret_dict
+            batch_size = pred.shape[0]
+
+            if side == "l":
+                if pred_l is None:
+                    pred_l = np.zeros((batch_size, args.num_lh_output))
+                    counter_l = np.zeros((batch_size, args.num_lh_output))
+                # counter_l[roi_idx[np.where(pred_l[roi_idx] != 0)[0]]] += 1
+                counter_l += roi_idx
+                pred_l[:, np.where(roi_idx)[0]] += pred.detach().cpu().numpy()
+            else:
+                if pred_r is None:
+                    pred_r = np.zeros((batch_size, args.num_rh_output))
+                    counter_r = np.zeros((batch_size, args.num_rh_output))
+
+                counter_r += roi_idx
+                # counter_r[roi_idx[np.where(pred_r[roi_idx] != 0)[0]]] += 1
+                pred_r[:, np.where(roi_idx)[0]] += pred.detach().cpu().numpy()
+
+        if side == "l":
+            pred_l_all = pred_all.detach().cpu().numpy()
+        else:
+            pred_r_all = pred_all.detach().cpu().numpy()
+
+    # import pdb; pdb.set_trace()
+    counter_l[np.where(counter_l == 0)] = 1
+    counter_r[np.where(counter_r == 0)] = 1
+
+    pred_l = pred_l / counter_l
+    pred_r = pred_r / counter_r
+
+    pred_l = (pred_l + pred_l_all) / 2
+    pred_r = (pred_r + pred_r_all) / 2
+    return pred_l, pred_r
 
 
 def train_one_epoch(
@@ -560,11 +692,10 @@ def train_one_epoch(
         model.eval()
         prefix = "VALID"
         metric_fn = Metric(args)
-        pred_gt_dict = {}
-        for side in args.side:
-            pred_gt_dict[side] = {}
-            pred_gt_dict[side]['pred'] = []
-            pred_gt_dict[side]['gt'] = []
+        pred_lh_fmris = []
+        pred_rh_fmris = []
+        gt_lh_fmris = []
+        gt_rh_fmris = []
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = "Epoch: [{}/{}]".format(epoch, args.epochs)
 
@@ -572,6 +703,10 @@ def train_one_epoch(
         for k, v in batch.items():
             if isinstance(v, torch.Tensor):
                 batch[k] = batch[k].cuda(non_blocking=True)
+
+        # if is_train and np.random.rand() < 0.5:
+        #     # import pdb; pdb.set_trace()
+        #     batch = mixup_data(batch, alpha=1.0, use_cuda=True)
 
         with torch.cuda.amp.autocast(fp16_scaler is not None):
             if not is_train:
@@ -585,11 +720,15 @@ def train_one_epoch(
                 loss = loss.mean()
 
             if not is_train:
-            # if True:
-                processed_pred = post_process_output(outputs, args)
-                for side in args.side:
-                    pred_gt_dict[side]['pred'].append(processed_pred[side])
-                    pred_gt_dict[side]['gt'].append(batch[side].detach().cpu().numpy())
+                # if True:
+                pred_lh_fmri, pred_rh_fmri = post_process_output(outputs, args)
+                gt_lh_fmri = batch["l"].detach().cpu().numpy()
+                gt_rh_fmri = batch["r"].detach().cpu().numpy()
+
+                pred_lh_fmris.append(pred_lh_fmri)
+                pred_rh_fmris.append(pred_rh_fmri)
+                gt_lh_fmris.append(gt_lh_fmri)
+                gt_rh_fmris.append(gt_rh_fmri)
 
         if not math.isfinite(loss.item()):
             print("Loss is {}, stopping training".format(loss.item()), force=True)
@@ -624,14 +763,11 @@ def train_one_epoch(
         # pred_rh_fmris.append(pred_rh_fmri)
         # gt_lh_fmris.append(gt_lh_fmri)
         # gt_rh_fmris.append(gt_rh_fmri)
-        for side in args.side:
-            pred_gt_dict[side]['pred'] = np.concatenate(pred_gt_dict[side]['pred'], axis=0)
-            pred_gt_dict[side]['gt'] = np.concatenate(pred_gt_dict[side]['gt'], axis=0)
-        # pred_lh_fmris = np.concatenate(pred_lh_fmris, axis=0)
-        # pred_rh_fmris = np.concatenate(pred_rh_fmris, axis=0)
-        # gt_lh_fmris = np.concatenate(gt_lh_fmris, axis=0)
-        # gt_rh_fmris = np.concatenate(gt_rh_fmris, axis=0)
-        metric_dict = metric_fn(pred_gt_dict)
+        pred_lh_fmris = np.concatenate(pred_lh_fmris, axis=0)
+        pred_rh_fmris = np.concatenate(pred_rh_fmris, axis=0)
+        gt_lh_fmris = np.concatenate(gt_lh_fmris, axis=0)
+        gt_rh_fmris = np.concatenate(gt_rh_fmris, axis=0)
+        metric_dict = metric_fn(pred_lh_fmris, pred_rh_fmris, gt_lh_fmris, gt_rh_fmris)
         for k, v in metric_dict.items():
             metric_logger.update(**{k: v})
     # gather the stats from all processes
@@ -647,6 +783,12 @@ if __name__ == "__main__":
     with open("subject_meta.pkl", "rb") as f:
         subject_metadata = pickle.load(f)
         args.subject_metadata = subject_metadata[args.subject]
-    args.side = args.side.split(",")
+
+    nc_lh = np.load(f"data/noise_ceiling/{args.subject}/lh.npy")
+    nc_rh = np.load(f"data/noise_ceiling/{args.subject}/rh.npy")
+
+    args.nc_lh = nc_lh
+    args.nc_rh = nc_rh
+
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     train(args)

@@ -37,22 +37,27 @@ export OFFSET=${OFFSET}
 
 # model_name='vit_small_patch16_224'
 # model_name='convnext_base_in22ft1k'
-# model_name='convnext_xlarge.fb_in22k_ft_in1k_384'
-model_name='seresnextaa101d_32x8d'
+# model_name='seresnext101d_32x8d'
+# model_name='coat_lite_medium_384.in1k'
+model_name='convnext_xlarge.fb_in22k_ft_in1k_384'
+# model_name='resnetrs420'
 # model_name='maxvit_large_tf_384.in21k_ft_in1k'
 # model_name='tf_efficientnet_b7.ns_jft_in1k'
 # model_name='resnetrs420'
 # model_name='maxvit_base_tf_384.in21k_ft_in1k'
 # model_name='eva_giant_patch14_224.clip_ft_in1k'
 # model_name='ssl_resnext50_32x4d'
+# model_name='xception71'
 
 # Data
-batch_size=16
+batch_size=8
 lr=2.5e-4
 distributed=True
 epochs=12
 img_size=384
 saveckp_freq=5
+scheduler='onecycle'
+num_folds=5
 
 JOB_NAME=${model_name}-${subject}
 
@@ -80,21 +85,23 @@ fi
 
 echo "Run command ", $command
 
-# output_dir=logs/roi_pcc_l1_384_ema/${subject}/${model_name}/
-side='r'
-output_dir=logs/stage2_lr/${subject}/${model_name}_${side}/
+
+output_dir=logs_new_loss_nc/finetune_0/${subject}/${model_name}/
+# output_dir=/scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/${subject}/${model_name}/
 # data_dir=/scratch/1576189/data
 data_dir=data/${subject}
 csv_file=${data_dir}/kfold.csv
 
-pretrained=logs/multisub/${model_name}/
-# pretrained=logs/stage1_lr/${SUBJECT}/${model_name}_l,r/
+pretrained=logs/leaveone/${subject}/${model_name}/
+# pseudo_dir=predictions_vision/ensemble_convnext_xlarge_seresnext101d_32x8d/
+pseudo_dir='none'
 
 PYTHONPATH=. $command \
         scripts/train.py \
         --model_name ${model_name} \
         --output_dir ${output_dir} \
         --data_dir ${data_dir} \
+        --pseudo_dir ${pseudo_dir} \
         --subject ${SUBJECT} \
         --csv_file ${csv_file} \
         --pretrained ${pretrained} \
@@ -104,7 +111,9 @@ PYTHONPATH=. $command \
         --epochs ${epochs} \
         --distributed ${distributed} \
         --saveckp_freq ${saveckp_freq} \
+        --scheduler ${scheduler} \
         --num_workers 4 \
+        --num_folds ${num_folds} \
+        --use_fp16 False \
         --side ${side} \
         --use_fp16 True \
-        --use_ema True
