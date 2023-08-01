@@ -85,6 +85,7 @@ fi
 
 echo "Run command ", $command
 
+
 output_dir=logs_new_loss_nc/finetune_0/${subject}/${model_name}/
 # output_dir=/scr1/1594489/logs/roi_pcc_l1_384_ema_ft_backbone/${subject}/${model_name}/
 # data_dir=/scratch/1576189/data
@@ -114,4 +115,5 @@ PYTHONPATH=. $command \
         --num_workers 4 \
         --num_folds ${num_folds} \
         --use_fp16 False \
-        --use_ema True
+        --side ${side} \
+        --use_fp16 True \
